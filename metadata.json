@@ -1,0 +1,5 @@
+{
+  "name": "AI Storyboard Creator",
+  "description": "A professional AI video creation tool that converts scripts into detailed storyboards with visual prompts and camera directions using Gemini.",
+  "requestFramePermissions": []
+}
