@@ -1,12 +1,10 @@
 import React from 'react';
-import { Asset } from '../types';
 import { Plus, Edit2 } from 'lucide-react';
+import { useAppStore } from '../store/useAppStore';
 
-interface AssetPanelProps {
-  assets: Asset[];
-}
-
-export const AssetPanel: React.FC<AssetPanelProps> = ({ assets }) => {
+export const AssetPanel: React.FC = () => {
+  const { assets } = useAppStore();
+  
   return (
     <div className="w-80 border-r border-app-border bg-app-bg flex flex-col shrink-0">
       <div className="h-14 flex items-center justify-between px-4 border-b border-app-border">

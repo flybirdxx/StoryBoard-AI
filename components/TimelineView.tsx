@@ -1,12 +1,9 @@
 import React from 'react';
-import { Scene } from '../types';
 import { Film, Play, Clock, Download } from 'lucide-react';
+import { useAppStore } from '../store/useAppStore';
 
-interface TimelineViewProps {
-  scenes: Scene[];
-}
-
-export const TimelineView: React.FC<TimelineViewProps> = ({ scenes }) => {
+export const TimelineView: React.FC = () => {
+  const { scenes } = useAppStore();
   const allShots = scenes.flatMap(s => s.shots);
   const totalDuration = allShots.reduce((acc, shot) => acc + (shot.duration || 3), 0);
 

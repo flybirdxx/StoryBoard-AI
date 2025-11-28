@@ -2,16 +2,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Asset, DetectedCharacter, ImageStyle } from '../types';
 import { Users, Plus, Loader2, AlertTriangle, CheckCircle2, Sparkles, Palette, Bold, Italic, List, X, Edit3, Trash2 } from 'lucide-react';
 import { generateCharacterImage } from '../services/geminiService';
-
-interface CharacterLibraryProps {
-  characters: Asset[];
-  detectedCharacters: DetectedCharacter[];
-  onAddCharacter: (asset: Asset) => void;
-  onRemoveCharacter: (id: string) => void;
-  onNext: () => void;
-  selectedStyle: ImageStyle;
-  onStyleChange: (style: ImageStyle) => void;
-}
+import { useAppStore } from '../store/useAppStore';
+import { useProjectActions } from '../hooks/useProjectActions';
 
 // Helper to strip HTML for AI prompt
 const stripHtml = (html: string) => {
@@ -69,15 +61,12 @@ const RichTextEditor = ({ value, onChange, placeholder }: { value: string, onCha
   );
 };
 
-export const CharacterLibrary: React.FC<CharacterLibraryProps> = ({ 
-  characters = [], 
-  detectedCharacters = [],
-  onAddCharacter, 
-  onRemoveCharacter, 
-  onNext,
-  selectedStyle,
-  onStyleChange
-}) => {
+export const CharacterLibrary: React.FC = () => {
+  const { assets, detectedCharacters, addAsset, removeAsset, selectedStyle, setSelectedStyle } = useAppStore();
+  const { handleGenerateStoryboardImages } = useProjectActions();
+  
+  const characters = assets.filter(a => a.type === 'Character');
+
   const [generatingId, setGeneratingId] = useState<string | null>(null);
   
   // Modal State
@@ -114,9 +103,7 @@ export const CharacterLibrary: React.FC<CharacterLibraryProps> = ({
   // Consistency Check Logic
   // --------------------------------------------------------------------------
   const getConsistencyStatus = (detectedName: string) => {
-    // Safety check for characters array
-    const safeCharacters = Array.isArray(characters) ? characters : [];
-    const match = safeCharacters.find(c => c.name.toLowerCase().includes(detectedName.toLowerCase()) || detectedName.toLowerCase().includes(c.name.toLowerCase()));
+    const match = characters.find(c => c.name.toLowerCase().includes(detectedName.toLowerCase()) || detectedName.toLowerCase().includes(c.name.toLowerCase()));
     return !!match;
   };
 
@@ -134,7 +121,7 @@ export const CharacterLibrary: React.FC<CharacterLibraryProps> = ({
             description: detected.description,
             imageUrl: imageUrl
         };
-        onAddCharacter(newAsset);
+        addAsset(newAsset);
     }
   };
 
@@ -157,7 +144,7 @@ export const CharacterLibrary: React.FC<CharacterLibraryProps> = ({
             description: cleanDescription, // We save the clean description for consistency
             imageUrl: imageUrl
         };
-        onAddCharacter(newAsset);
+        addAsset(newAsset);
         setNewCharName('');
         setNewCharDesc('');
     }
@@ -193,7 +180,7 @@ export const CharacterLibrary: React.FC<CharacterLibraryProps> = ({
                <span className="text-xs text-gray-400 font-medium">生成风格:</span>
                <select 
                  value={selectedStyle} 
-                 onChange={(e) => onStyleChange(e.target.value as ImageStyle)}
+                 onChange={(e) => setSelectedStyle(e.target.value as ImageStyle)}
                  className="bg-transparent text-sm font-medium text-gray-200 focus:outline-none cursor-pointer hover:text-white transition-colors"
                >
                  {styles.map(s => <option key={s} value={s} className="bg-app-card">{styleMap[s]}</option>)}
@@ -201,7 +188,7 @@ export const CharacterLibrary: React.FC<CharacterLibraryProps> = ({
             </div>
 
             <button 
-              onClick={onNext}
+              onClick={handleGenerateStoryboardImages}
               className="bg-app-accent hover:bg-app-accentHover text-white px-6 py-2 rounded-full font-semibold shadow-lg shadow-purple-900/40 flex items-center gap-2 transition-transform hover:scale-105 active:scale-95"
             >
                 <Sparkles size={18} />
@@ -393,7 +380,7 @@ export const CharacterLibrary: React.FC<CharacterLibraryProps> = ({
                         </button>
                         <button 
                             onClick={() => {
-                                onRemoveCharacter(selectedChar.id);
+                                removeAsset(selectedChar.id);
                                 closeModal();
                             }}
                             className="flex-1 py-2.5 rounded-lg bg-red-900/20 hover:bg-red-900/40 text-red-400 border border-red-900/30 text-sm font-medium transition-colors flex items-center justify-center gap-2"

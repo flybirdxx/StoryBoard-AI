@@ -4,7 +4,7 @@ import { Video, Maximize2, RefreshCw, Edit3, Loader2, Save, X, ImageOff, Clock, 
 
 interface ShotCardProps {
   shot: Shot;
-  onRegenerate: (shot: Shot) => void;
+  onRegenerate: () => void;
   onUpdate: (id: number, updates: Partial<Shot>) => void;
   onMaximize: (imageUrl: string) => void;
 }
@@ -88,7 +88,7 @@ export const ShotCard: React.FC<ShotCardProps> = ({ shot, onRegenerate, onUpdate
             className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
           />
         ) : (
-          <div className="w-full h-full flex flex-col items-center justify-center bg-[#12141a] border-b border-app-border/50 group-hover:bg-[#1a1f2b] transition-colors cursor-pointer" onClick={() => onRegenerate(shot)}>
+          <div className="w-full h-full flex flex-col items-center justify-center bg-[#12141a] border-b border-app-border/50 group-hover:bg-[#1a1f2b] transition-colors cursor-pointer" onClick={() => onRegenerate()}>
              <div className="w-12 h-12 rounded-full bg-gray-800/50 flex items-center justify-center mb-2 group-hover:bg-gray-700 transition-colors">
                 <ImageOff size={20} className="text-gray-600 group-hover:text-gray-400" />
              </div>
@@ -109,7 +109,7 @@ export const ShotCard: React.FC<ShotCardProps> = ({ shot, onRegenerate, onUpdate
         {!isEditing && (
           <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3 z-20 pointer-events-none">
              <button 
-               onClick={(e) => { e.stopPropagation(); onRegenerate(shot); }}
+               onClick={(e) => { e.stopPropagation(); onRegenerate(); }}
                className="p-2 rounded-full bg-white/10 hover:bg-app-accent text-white backdrop-blur-sm transition-all transform hover:scale-105 pointer-events-auto"
                title={shot.imageUrl ? "重新生成图片" : "生成图片"}
              >

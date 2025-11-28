@@ -1,5 +1,6 @@
 import React from 'react';
 import { NavItem } from '../types';
+import { useNavigate } from 'react-router-dom';
 import { 
   BookOpen, 
   Users, 
@@ -14,22 +15,22 @@ import {
 
 interface SidebarProps {
   activeItem: NavItem;
-  setActiveItem: (item: NavItem) => void;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ activeItem, setActiveItem }) => {
-  
+export const Sidebar: React.FC<SidebarProps> = ({ activeItem }) => {
+  const navigate = useNavigate();
+
   const navItems = [
-    { id: NavItem.SCRIPT, label: '剧本编辑', icon: <BookOpen size={20} /> },
-    { id: NavItem.CHARACTERS, label: '角色库', icon: <Users size={20} /> },
-    { id: NavItem.STORYBOARD, label: '故事板', icon: <Clapperboard size={20} /> },
-    { id: NavItem.TIMELINE, label: '时间线', icon: <Film size={20} /> },
-    { id: NavItem.ASSETS, label: '素材库', icon: <Library size={20} /> },
-    { id: NavItem.SUBSCRIPTION, label: '订阅服务', icon: <CreditCard size={20} /> },
+    { id: NavItem.SCRIPT, label: '剧本编辑', icon: <BookOpen size={20} />, path: '/script' },
+    { id: NavItem.CHARACTERS, label: '角色库', icon: <Users size={20} />, path: '/characters' },
+    { id: NavItem.STORYBOARD, label: '故事板', icon: <Clapperboard size={20} />, path: '/storyboard' },
+    { id: NavItem.TIMELINE, label: '时间线', icon: <Film size={20} />, path: '/timeline' },
+    { id: NavItem.ASSETS, label: '素材库', icon: <Library size={20} />, path: '/assets' },
+    { id: NavItem.SUBSCRIPTION, label: '订阅服务', icon: <CreditCard size={20} />, path: '/subscription' },
   ];
 
   return (
-    <div className="w-64 h-screen bg-app-sidebar border-r border-app-border flex flex-col justify-between shrink-0">
+    <div className="w-64 h-full bg-app-sidebar border-r border-app-border flex flex-col justify-between shrink-0">
       
       {/* Top Section */}
       <div>
@@ -47,7 +48,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeItem, setActiveItem }) =
           {navItems.map((item) => (
             <button
               key={item.id}
-              onClick={() => setActiveItem(item.id)}
+              onClick={() => navigate(item.path)}
               className={`w-full flex items-center px-4 py-3 rounded-lg text-sm font-medium transition-all duration-200
                 ${activeItem === item.id 
                   ? 'bg-app-accent/10 text-app-accent border-l-2 border-app-accent' 
