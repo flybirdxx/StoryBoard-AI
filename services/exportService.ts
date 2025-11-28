@@ -181,25 +181,203 @@ const compositeImageWithText = async (base64: string, text: string, mode: Genera
   });
 };
 
+/**
+ * Generates a Comic Page Grid (Stitched Image)
+ */
+const generateComicSheet = async (scenes: Scene[], title: string, hasBurntText: boolean): Promise<Blob> => {
+  const loadedImages = await Promise.all(scenes.map(s => new Promise<{img: HTMLImageElement, scene: Scene}>((resolve) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.src = s.imageUrl || '';
+    img.onload = () => resolve({img, scene: s});
+    img.onerror = () => resolve({img, scene: s});
+  })));
+
+  if (loadedImages.length === 0) return new Blob();
+
+  const CANVAS_WIDTH = 2480; // A4 Width @ 300dpi is approx 2480px
+  const MARGIN = 120;
+  const GUTTER_X = 80;
+  const GUTTER_Y = 100;
+  const COLS = 2; // Classic Comic Layout
+  const PANEL_WIDTH = (CANVAS_WIDTH - (MARGIN * 2) - (GUTTER_X * (COLS - 1))) / COLS;
+
+  // Temporary canvas for text measurement
+  const tempCanvas = document.createElement('canvas');
+  const tempCtx = tempCanvas.getContext('2d');
+  
+  // Calculate Layout Positions
+  let currentX = MARGIN;
+  let currentY = 320; // Start after Header
+  let maxHeightInRow = 0;
+  
+  const renderItems: any[] = [];
+  
+  loadedImages.forEach((item, index) => {
+      const { img, scene } = item;
+      const aspectRatio = img.width > 0 ? img.width / img.height : 1.33;
+      const renderHeight = PANEL_WIDTH / aspectRatio;
+      
+      let textHeight = 0;
+      let lines: string[] = [];
+
+      // Calculate separate text height if text is NOT burnt into the image
+      if (!hasBurntText && tempCtx) {
+           tempCtx.font = '32px "Microsoft YaHei", sans-serif';
+           const maxWidth = PANEL_WIDTH;
+           const words = scene.narrative.split('');
+           let currentLine = words[0] || '';
+           for (let i = 1; i < words.length; i++) {
+               const width = tempCtx.measureText(currentLine + words[i]).width;
+               if (width < maxWidth) {
+                   currentLine += words[i];
+               } else {
+                   lines.push(currentLine);
+                   currentLine = words[i];
+               }
+           }
+           lines.push(currentLine);
+           textHeight = (lines.length * 48) + 30; // Line height + padding
+      }
+
+      // Grid Logic
+      const colIndex = index % COLS;
+      if (colIndex === 0 && index !== 0) {
+          // New Row: Advance Y by previous row's max height + gutter
+          currentY += maxHeightInRow + GUTTER_Y;
+          currentX = MARGIN;
+          maxHeightInRow = 0;
+      }
+
+      const totalItemHeight = renderHeight + textHeight;
+      if (totalItemHeight > maxHeightInRow) maxHeightInRow = totalItemHeight;
+
+      renderItems.push({
+          img,
+          x: currentX,
+          y: currentY,
+          w: PANEL_WIDTH,
+          h: renderHeight,
+          textLines: lines,
+          textHeight,
+          sceneId: scene.id + 1
+      });
+
+      // Advance X
+      currentX += PANEL_WIDTH + GUTTER_X;
+  });
+
+  // Calculate Final Height
+  const totalHeight = currentY + maxHeightInRow + MARGIN;
+  
+  const canvas = document.createElement('canvas');
+  canvas.width = CANVAS_WIDTH;
+  canvas.height = totalHeight;
+  const ctx = canvas.getContext('2d');
+  
+  if (!ctx) return new Blob();
+
+  // 1. Draw Background
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  
+  // 2. Draw Header
+  ctx.fillStyle = '#000000';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  
+  // Title
+  ctx.font = 'bold 80px "Microsoft YaHei", sans-serif';
+  ctx.fillText(title, CANVAS_WIDTH / 2, 120);
+  
+  // Metadata
+  ctx.font = 'bold 30px "Microsoft YaHei", monospace';
+  ctx.fillStyle = '#555555';
+  const dateStr = new Date().toLocaleDateString();
+  ctx.fillText(`ISSUE #01  •  ${dateStr}  •  GEMINI AI COMICS`, CANVAS_WIDTH / 2, 220);
+
+  // Separator Line
+  ctx.beginPath();
+  ctx.moveTo(MARGIN, 260);
+  ctx.lineTo(CANVAS_WIDTH - MARGIN, 260);
+  ctx.strokeStyle = '#000000';
+  ctx.lineWidth = 4;
+  ctx.stroke();
+
+  // 3. Draw Panels
+  renderItems.forEach((item: any) => {
+      // Draw Shadow (Hard Edge Comic Style)
+      const shadowOffset = 15;
+      ctx.fillStyle = '#000000';
+      ctx.fillRect(item.x + shadowOffset, item.y + shadowOffset, item.w, item.h);
+
+      // Draw Image
+      if (item.img.width > 0) {
+        ctx.drawImage(item.img, item.x, item.y, item.w, item.h);
+      } else {
+        // Fallback for empty image
+        ctx.fillStyle = '#eeeeee';
+        ctx.fillRect(item.x, item.y, item.w, item.h);
+      }
+      
+      // Draw Border
+      ctx.strokeStyle = '#000000';
+      ctx.lineWidth = 6;
+      ctx.strokeRect(item.x, item.y, item.w, item.h);
+
+      // Draw Panel Number Badge (Top Left Corner overlap)
+      const badgeSize = 50;
+      ctx.fillStyle = '#000000';
+      ctx.beginPath();
+      ctx.arc(item.x, item.y, badgeSize/2, 0, Math.PI*2);
+      ctx.fill();
+      
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 24px Arial';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(String(item.sceneId), item.x, item.y);
+
+      // Draw Separated Text if needed (Below panel)
+      if (!hasBurntText && item.textLines.length > 0) {
+          ctx.fillStyle = '#000000';
+          ctx.font = '32px "Microsoft YaHei", sans-serif';
+          ctx.textAlign = 'left';
+          ctx.textBaseline = 'top';
+          
+          const textStartY = item.y + item.h + 25;
+          item.textLines.forEach((line: string, i: number) => {
+              ctx.fillText(line, item.x, textStartY + (i * 48));
+          });
+      }
+  });
+
+  // Footer / Page Number
+  ctx.fillStyle = '#000000';
+  ctx.font = 'bold 24px Arial';
+  ctx.textAlign = 'center';
+  ctx.fillText("PAGE 1", CANVAS_WIDTH / 2, totalHeight - 40);
+
+  return new Promise(resolve => canvas.toBlob(blob => resolve(blob!), 'image/png'));
+};
+
 const generateLongImage = async (scenes: Scene[], title: string, hasBurntText: boolean): Promise<Blob> => {
   const loadedImages = await Promise.all(scenes.map(s => new Promise<{img: HTMLImageElement, scene: Scene}>((resolve) => {
     const img = new Image();
     img.crossOrigin = "anonymous";
     img.src = s.imageUrl || '';
     img.onload = () => resolve({img, scene: s});
+    img.onerror = () => resolve({img, scene: s});
   })));
 
   if (loadedImages.length === 0) return new Blob();
 
-  // Standard width for the long strip
   const CANVAS_WIDTH = 1080;
   const PADDING_X = 40;
   
-  // Temporary canvas for measuring text if needed
   const tempCanvas = document.createElement('canvas');
   const tempCtx = tempCanvas.getContext('2d');
   
-  // Calculate total height
   let totalHeight = 0;
   totalHeight += 150; // Title Area
   
@@ -209,13 +387,12 @@ const generateLongImage = async (scenes: Scene[], title: string, hasBurntText: b
   
   for (const item of loadedImages) {
     const { img, scene } = item;
-    const aspectRatio = img.width / img.height;
+    const aspectRatio = img.width > 0 ? img.width / img.height : 1.77;
     const renderHeight = CANVAS_WIDTH / aspectRatio;
     
     let textHeight = 0;
     let lines: string[] = [];
     
-    // If text is NOT burnt in, calculate space for narrative below image
     if (!hasBurntText && tempCtx) {
        tempCtx.font = '24px "Microsoft YaHei", sans-serif';
        const maxWidth = CANVAS_WIDTH - (PADDING_X * 2);
@@ -235,7 +412,7 @@ const generateLongImage = async (scenes: Scene[], title: string, hasBurntText: b
        }
        lines.push(currentLine);
        
-       textHeight = (lines.length * 36) + 40; // Line height + padding
+       textHeight = (lines.length * 36) + 40; 
     }
     
     renderItems.push({
@@ -248,12 +425,11 @@ const generateLongImage = async (scenes: Scene[], title: string, hasBurntText: b
        textHeight: textHeight
     });
     
-    currentY += renderHeight + textHeight + 20; // Gap
+    currentY += renderHeight + textHeight + 20; 
   }
   
-  totalHeight = currentY + 60; // Bottom padding
+  totalHeight = currentY + 60; 
   
-  // Create Final Canvas
   const canvas = document.createElement('canvas');
   canvas.width = CANVAS_WIDTH;
   canvas.height = totalHeight;
@@ -261,22 +437,18 @@ const generateLongImage = async (scenes: Scene[], title: string, hasBurntText: b
   
   if (!ctx) return new Blob();
   
-  // Draw Background
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   
-  // Draw Title
   ctx.fillStyle = '#000000';
   ctx.font = 'bold 48px "Microsoft YaHei", sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText(title, CANVAS_WIDTH / 2, 75);
   
-  // Draw Scenes
   for (const item of renderItems) {
-     ctx.drawImage(item.img, item.x, item.y, item.w, item.h);
+     if (item.img.width > 0) ctx.drawImage(item.img, item.x, item.y, item.w, item.h);
      
-     // Draw Narrative Text below image if separated
      if (!hasBurntText && item.textLines && item.textLines.length > 0) {
         ctx.fillStyle = '#000000';
         ctx.font = '24px "Microsoft YaHei", sans-serif';
@@ -302,7 +474,6 @@ export const exportScenes = async (
   const validScenes = scenes.filter(s => s.imageUrl);
   if (validScenes.length === 0) return;
 
-  // Pre-process images (burn-in text) if enabled
   const processedScenes = await Promise.all(validScenes.map(async (scene) => {
      if (config.withText && scene.imageUrl) {
         const newUrl = await compositeImageWithText(scene.imageUrl, scene.narrative, mode);
@@ -312,15 +483,14 @@ export const exportScenes = async (
   }));
 
   if (config.format === 'pdf') {
-    // A4 Landscape
     const doc = new jsPDF({
       orientation: 'landscape',
       unit: 'mm',
       format: 'a4'
     });
 
-    const pageWidth = doc.internal.pageSize.getWidth();   // ~297mm
-    const pageHeight = doc.internal.pageSize.getHeight(); // ~210mm
+    const pageWidth = doc.internal.pageSize.getWidth(); 
+    const pageHeight = doc.internal.pageSize.getHeight(); 
     const margin = 10;
     const contentWidth = pageWidth - (margin * 2);
 
@@ -328,52 +498,37 @@ export const exportScenes = async (
       const scene = processedScenes[i];
       if (i > 0) doc.addPage();
 
-      // --- 1. Generate Text Images (for Header & Footer) ---
       const titleText = `${storyTitle} - ${mode === 'comic' ? 'Panel' : 'Scene'} ${scene.id + 1}`;
       const titleImg = textToImage(titleText, contentWidth, true);
-      
-      // For narrative, we give it the full width
       const narrativeImg = textToImage(scene.narrative, contentWidth, false);
 
-      // --- 2. Calculate Layout ---
       const spacing = 5;
       const headerHeight = titleImg.heightMm > 0 ? titleImg.heightMm + spacing : 0;
       const footerHeight = narrativeImg.heightMm > 0 ? narrativeImg.heightMm + spacing : 0;
-      
-      // Remaining space for the image
       const availableHeight = pageHeight - (margin * 2) - headerHeight - footerHeight;
       
-      // --- 3. Add Title Image ---
       if (titleImg.dataUrl) {
         doc.addImage(titleImg.dataUrl, 'PNG', margin, margin, contentWidth, titleImg.heightMm);
       }
 
-      // --- 4. Add Main Image (Dynamic Scaling) ---
       if (scene.imageUrl) {
         const imgProps = doc.getImageProperties(scene.imageUrl);
         const imgRatio = imgProps.width / imgProps.height;
-
         let finalWidth = contentWidth;
         let finalHeight = contentWidth / imgRatio;
 
-        // If height exceeds available space, scale by height instead
         if (finalHeight > availableHeight) {
           finalHeight = availableHeight;
           finalWidth = availableHeight * imgRatio;
         }
 
-        // Center horizontally
         const xOffset = margin + (contentWidth - finalWidth) / 2;
-        // Position Y immediately after title
         const yOffset = margin + headerHeight;
 
         doc.addImage(scene.imageUrl, 'PNG', xOffset, yOffset, finalWidth, finalHeight);
       }
 
-      // --- 5. Add Narrative Image (Footer) ---
       if (narrativeImg.dataUrl) {
-        // Position at the bottom of the page relative to margin
-        // To ensure consistency, we anchor it to bottom-margin
         const yPos = pageHeight - margin - narrativeImg.heightMm;
         doc.addImage(narrativeImg.dataUrl, 'PNG', margin, yPos, contentWidth, narrativeImg.heightMm);
       }
@@ -381,7 +536,6 @@ export const exportScenes = async (
 
     doc.save(`${storyTitle.replace(/\s+/g, '_')}_Storyboard.pdf`);
   } 
-  
   else if (config.format === 'zip') {
     const zip = new JSZip();
     const folder = zip.folder("storyboard_images");
@@ -402,9 +556,15 @@ export const exportScenes = async (
     const content = await zip.generateAsync({ type: "blob" });
     saveAs(content, `${storyTitle.replace(/\s+/g, '_')}_Assets.zip`);
   }
-
   else if (config.format === 'long-image') {
-    const blob = await generateLongImage(processedScenes, storyTitle, config.withText);
-    saveAs(blob, `${storyTitle.replace(/\s+/g, '_')}_LongImage.png`);
+    if (mode === 'comic') {
+       // Switch to Comic Grid Layout
+       const blob = await generateComicSheet(processedScenes, storyTitle, config.withText);
+       saveAs(blob, `${storyTitle.replace(/\s+/g, '_')}_ComicPage.png`);
+    } else {
+       // Default Long Strip
+       const blob = await generateLongImage(processedScenes, storyTitle, config.withText);
+       saveAs(blob, `${storyTitle.replace(/\s+/g, '_')}_LongImage.png`);
+    }
   }
 };

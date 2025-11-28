@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { checkApiKey, generateStoryScript, generateSceneImage, generatePlotOptions, extendStoryScript, generateSpeech, polishText, generateSceneVideo, optimizeFullStory, analyzeCharacterVisuals } from './services/geminiService';
 import { storageService } from './services/storageService';
@@ -7,9 +6,10 @@ import StoryForm from './components/StoryForm';
 import Storyboard from './components/Storyboard';
 import ApiKeySelector from './components/ApiKeySelector';
 import AnchorReviewModal from './components/AnchorReviewModal';
-
-import { StoryData, Scene, PlotOption, ArtStyle, ExportConfig, GenerationMode, AspectRatio, Character, VisualAnchor, ImageFeedback } from './types';
-import { Loader2, Film, Layout, Sparkles, Save as SaveIcon } from 'lucide-react';
+import Sidebar, { ViewType } from './components/Sidebar';
+import CharacterLibrary from './components/CharacterLibrary';
+import { StoryData, Scene, PlotOption, ArtStyle, ExportConfig, GenerationMode, AspectRatio, Character, VisualAnchor } from './types';
+import { Loader2 } from 'lucide-react';
 
 const App: React.FC = () => {
   const [hasKey, setHasKey] = useState<boolean>(false);
@@ -81,10 +81,6 @@ const App: React.FC = () => {
       setCurrentMode(draft.mode);
       if (draft.visualAnchors) {
          setDetectedAnchors(draft.visualAnchors);
-      }
-      // Restore reference images from persistent storage
-      if (draft.referenceImages && draft.referenceImages.length > 0) {
-         setOriginalImages(draft.referenceImages);
       }
       setCurrentView('editor');
     }
@@ -226,22 +222,16 @@ const App: React.FC = () => {
     setHistory([]);
     setHistoryIndex(-1);
     setIsScriptLoading(true);
-    setCurrentView('editor'); 
+    setCurrentView('editor'); // Switch to editor view to show loading state if preferred, or keep on create until done.
 
     try {
       const storyData = await generateStoryScript(theme, originalImages, finalAnchors, currentStyle, currentMode, currentRatio);
       
-      const storyWithMode: StoryData = { 
-        ...storyData, 
-        mode: currentMode,
-        // SAVE REFERENCE IMAGES FOR PERSISTENCE
-        referenceImages: originalImages
-      };
-      
+      const storyWithMode = { ...storyData, mode: currentMode };
       setStory(storyWithMode);
       pushToHistory(storyWithMode, "故事生成");
       setIsScriptLoading(false);
-      setCurrentView('editor');
+      setCurrentView('editor'); // Force switch to editor
 
       await generateImagesForScenes(
          storyData.scenes, 
@@ -258,7 +248,7 @@ const App: React.FC = () => {
       console.error("Error in story flow:", error);
       alert("生成故事时出错。");
       setIsScriptLoading(false);
-      setCurrentView('create'); 
+      setCurrentView('create'); // Switch back on failure
     }
   };
 
@@ -300,7 +290,7 @@ const App: React.FC = () => {
      }
   };
 
-  const handleModifyImage = async (sceneId: number, feedback: ImageFeedback) => {
+  const handleModifyImage = async (sceneId: number, feedback: string) => {
     if (!story || originalImages.length === 0) return;
     const scene = story.scenes.find(s => s.id === sceneId);
     if (!scene) return;
@@ -404,14 +394,6 @@ const App: React.FC = () => {
       scenes: story.scenes.map(s => s.id === sceneId ? { ...s, tags } : s)
     };
     setStory(newState);
-  };
-
-  const handleUpdateCharacters = (sceneId: number, chars: string[]) => {
-    if (!story) return;
-    setStory(prev => prev ? {
-      ...prev,
-      scenes: prev.scenes.map(s => s.id === sceneId ? { ...s, characters: chars } : s)
-    } : null);
   };
 
   const handleGetOptions = async () => {
@@ -605,61 +587,43 @@ const App: React.FC = () => {
           )}
 
           {/* VIEW: EDITOR / STORYBOARD */}
-          {currentView === 'editor' && (
-            <>
-              {isScriptLoading ? (
-                <div className="h-full flex flex-col items-center justify-center text-slate-400">
-                   <div className="relative mb-6">
-                      <div className="absolute inset-0 bg-indigo-500/20 rounded-full blur-xl animate-pulse"></div>
-                      <Loader2 className="w-12 h-12 text-indigo-400 animate-spin relative z-10" />
-                   </div>
-                   <h3 className="text-xl font-bold text-white mb-2">正在构建故事世界...</h3>
-                   <p className="text-sm max-w-md text-center opacity-70">Gemini 3 Pro 正在编写剧本并绘制首批分镜。</p>
-                </div>
-              ) : story ? (
-                <div className="p-8 md:p-12">
-                  <Storyboard 
-                    story={story} 
-                    characterImages={originalImages}
-                    onRetryImage={handleRetryImage}
-                    onModifyImage={handleModifyImage}
-                    onUpdateScene={handleUpdateScene}
-                    onUpdateTags={handleUpdateTags}
-                    onUpdateCharacters={handleUpdateCharacters}
-                    onRequestOptions={handleGetOptions}
-                    onSelectOption={handleExtendStory}
-                    onGenerateAudio={handleGenerateAudio}
-                    onGenerateVideo={handleGenerateVideo}
-                    onPolishText={handlePolishText}
-                    onExport={handleExport}
-                    onOptimizeStory={handleOptimizeStory}
-                    plotOptions={plotOptions}
-                    isLoadingOptions={isLoadingOptions}
-                    isExtendingStory={isExtendingStory}
-                    isOptimizingStory={isOptimizingStory}
-                    canUndo={historyIndex > 0}
-                    canRedo={historyIndex < history.length - 1}
-                    onUndo={handleUndo}
-                    onRedo={handleRedo}
-                    historyList={history}
-                    currentHistoryIndex={historyIndex}
-                    onJumpToHistory={handleJumpToHistory}
-                  />
-                </div>
-              ) : (
-                <div className="h-full flex flex-col items-center justify-center p-8 text-center text-slate-500">
-                    <div className="relative mb-6 inline-block">
-                        <div className="absolute inset-0 bg-indigo-500/10 blur-xl rounded-full"></div>
-                        <Layout className="w-16 h-16 text-slate-700 relative z-10" />
-                    </div>
-                    <h3 className="text-xl font-bold text-white mb-2">暂无活跃项目</h3>
-                    <p className="mb-6 opacity-60">请前往创作中心生成新故事</p>
-                    <button onClick={() => setCurrentView('create')} className="px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl shadow-lg transition-all flex items-center gap-2 mx-auto">
-                        <Sparkles className="w-4 h-4" /> 去创作
-                    </button>
-                </div>
-              )}
-            </>
+          {currentView === 'editor' && story && (
+            <div className="p-8 md:p-12">
+              <Storyboard 
+                story={story} 
+                onRetryImage={handleRetryImage}
+                onModifyImage={handleModifyImage}
+                onUpdateScene={handleUpdateScene}
+                onUpdateTags={handleUpdateTags}
+                onRequestOptions={handleGetOptions}
+                onSelectOption={handleExtendStory}
+                onGenerateAudio={handleGenerateAudio}
+                onGenerateVideo={handleGenerateVideo}
+                onPolishText={handlePolishText}
+                onExport={handleExport}
+                onOptimizeStory={handleOptimizeStory}
+                plotOptions={plotOptions}
+                isLoadingOptions={isLoadingOptions}
+                isExtendingStory={isExtendingStory}
+                isOptimizingStory={isOptimizingStory}
+                canUndo={historyIndex > 0}
+                canRedo={historyIndex < history.length - 1}
+                onUndo={handleUndo}
+                onRedo={handleRedo}
+                historyList={history}
+                currentHistoryIndex={historyIndex}
+                onJumpToHistory={handleJumpToHistory}
+              />
+            </div>
+          )}
+
+          {/* EMPTY EDITOR STATE */}
+          {currentView === 'editor' && !story && (
+             <div className="h-full flex flex-col items-center justify-center text-slate-500">
+                <Loader2 className="w-10 h-10 mb-4 opacity-20" />
+                <p>暂无活跃项目。请前往创作中心生成新故事。</p>
+                <button onClick={() => setCurrentView('create')} className="mt-4 text-indigo-400 hover:text-white underline text-sm">去创作</button>
+             </div>
           )}
         </div>
       </main>

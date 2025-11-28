@@ -1,23 +1,18 @@
 
 import { GoogleGenAI, Type, Modality, HarmCategory, HarmBlockThreshold, GenerateContentResponse } from "@google/genai";
-import { Scene, StoryData, PlotOption, ArtStyle, GenerationMode, AspectRatio, VisualAnchor, ImageFeedback } from "../types";
+import { Scene, StoryData, PlotOption, ArtStyle, GenerationMode, AspectRatio, VisualAnchor } from "../types";
 
 // Helper to ensure we always get a fresh instance with the environment key
 const getAIClient = () => {
-  let apiKey = localStorage.getItem("gemini_api_key");
-  
-  // Safely check process.env for development environments
-  if (!apiKey && typeof process !== 'undefined' && process.env && process.env.API_KEY) {
-    apiKey = process.env.API_KEY;
-  }
-
-  if (!apiKey || !apiKey.trim()) {
+  const apiKey = localStorage.getItem("gemini_api_key") || process.env.API_KEY;
+  if (!apiKey) {
     throw new Error("API Key not found. Please set it in the settings.");
   }
-  return new GoogleGenAI({ apiKey: apiKey.trim() });
+  return new GoogleGenAI({ apiKey });
 };
 
-// Standard Safety Settings
+// Standard Safety Settings to prevent over-blocking of creative content
+// Using BLOCK_NONE where possible, or BLOCK_ONLY_HIGH to allow creative freedom
 const SAFETY_SETTINGS = [
   { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
   { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
@@ -34,13 +29,11 @@ async function callWithRetry<T>(fn: () => Promise<T>, retries = 3, delayMs = 100
     } catch (error: any) {
       console.warn(`Gemini API Attempt ${i + 1} failed:`, error);
       lastError = error;
-      
-      const errStr = error.toString();
       // If error suggests blocking or invalid arg, don't retry, just throw
-      if (errStr.includes("Safety") || errStr.includes("Blocked") || errStr.includes("API key") || errStr.includes("CREDENTIALS_MISSING") || errStr.includes("UNAUTHENTICATED")) {
+      if (error.toString().includes("Safety") || error.toString().includes("Blocked")) {
         throw error;
       }
-      // Wait before retrying
+      // Wait before retrying (exponential backoff)
       await new Promise(resolve => setTimeout(resolve, delayMs * Math.pow(2, i)));
     }
   }
@@ -50,10 +43,8 @@ async function callWithRetry<T>(fn: () => Promise<T>, retries = 3, delayMs = 100
 const buildMultiModalParts = (textPrompt: string, images: string[]) => {
   const parts: any[] = [];
   images.forEach(img => {
-    if (!img) return;
     let mimeType = "image/png";
     let data = img;
-    // Basic regex to extract base64 if present
     const match = img.match(/^data:(.+);base64,(.+)$/);
     if (match) {
       mimeType = match[1];
@@ -81,22 +72,27 @@ export const analyzeCharacterVisuals = async (
     items: {
       type: Type.OBJECT,
       properties: {
-        name: { type: Type.STRING, description: "Suggested name" },
-        description: { type: Type.STRING, description: "Detailed visual description. FOCUS ON FIXED IDENTIFIERS." },
-        previewImageIndex: { type: Type.INTEGER, description: "The index (0-based) of the image." }
+        name: { type: Type.STRING, description: "Suggested name (e.g., 'Protagonist', 'Little Boy', 'Robot')" },
+        description: { type: Type.STRING, description: "Detailed visual description (Appearance, Clothes, Age, Accessories)" },
+        previewImageIndex: { type: Type.INTEGER, description: "The index (0-based) of the image that best represents this character in the provided list." }
       },
       required: ["name", "description", "previewImageIndex"]
     }
   };
 
-  const prompt = `Role: Senior Character Designer.
-  Task: Analyze the provided reference images for a story about: "${theme}".
-  Goal: Create strict "Visual Anchors".
+  const prompt = `Analyze the provided reference images for a story about: "${theme}".
+  Identify the distinct main characters present in these images.
   
-  For each distinct character identified:
-  1. Assign a clear Name.
-  2. Write a "Visual Anchor" description.
-  3. Identify the 0-based index of the best reference image.`;
+  For each distinct character, provide:
+  1. A short name.
+  2. A highly detailed "Visual Anchor" description in English. This description will be used to generate consistent images of this character. Include:
+     - Body type & Age
+     - Hair style & Color
+     - Facial features
+     - Clothing details (colors, style, textures)
+  3. The index of the image that best identifies them (0 for the first image, 1 for the second, etc.).
+  
+  If multiple images show the same character, merge their details into one anchor.`;
 
   try {
     const response = await callWithRetry<GenerateContentResponse>(() => ai.models.generateContent({
@@ -114,31 +110,23 @@ export const analyzeCharacterVisuals = async (
     const text = response.text;
     if (!text) return [];
     
-    let parsed;
-    try {
-      parsed = JSON.parse(text);
-    } catch (e) {
-      console.warn("Failed to parse visual anchors JSON", e);
-      return [];
-    }
-
-    if (!Array.isArray(parsed)) return [];
-
+    const parsed = JSON.parse(text) as any[];
     return parsed.map((p: any, i: number) => ({
       id: `anchor_${Date.now()}_${i}`,
-      // Ensure name is always a string to prevent "reading '0'" error on undefined
-      name: (p.name && typeof p.name === 'string') ? p.name : `Character ${i + 1}`, 
-      description: p.description || "No description provided.",
-      previewImageIndex: typeof p.previewImageIndex === 'number' ? p.previewImageIndex : -1
+      name: p.name,
+      description: p.description,
+      previewImageIndex: p.previewImageIndex
     }));
   } catch (error) {
     console.error("Character analysis failed:", error);
+    // Return empty array instead of throwing to allow manual creation or fallback
     return [];
   }
 };
 
 /**
  * Generates the story script using Gemini 3 Pro.
+ * Now generates a World Anchor and decoupled visual prompts.
  */
 export const generateStoryScript = async (
   theme: string,
@@ -154,6 +142,7 @@ export const generateStoryScript = async (
   const hasAnchors = anchors.length > 0;
   const anchorNames = anchors.map(a => a.name).join(", ");
 
+  // Handle case where no anchors exist to prevent Schema validation errors
   const charactersSchema = hasAnchors 
     ? { 
         type: Type.ARRAY, 
@@ -170,15 +159,15 @@ export const generateStoryScript = async (
     type: Type.OBJECT,
     properties: {
       title: { type: Type.STRING, description: "Story Title" },
-      world_anchor: { type: Type.STRING, description: "Global environment description." },
+      world_anchor: { type: Type.STRING, description: "A consistent environment/lighting/atmosphere description that applies to the entire story. Must specify Color Palette and Lighting Style." },
       scenes: {
         type: Type.ARRAY,
-        description: "List of scenes/panels",
+        description: mode === 'comic' ? "3-5 Comic Panels" : "3-5 Storyboard Scenes",
         items: {
           type: Type.OBJECT,
           properties: {
-            narrative: { type: Type.STRING },
-            visual_prompt: { type: Type.STRING },
+            narrative: { type: Type.STRING, description: "Chinese story text." },
+            visual_prompt: { type: Type.STRING, description: "English visual prompt focusing ONLY on action, composition, and camera angle. Do NOT include detailed character appearance descriptions here." },
             characters: charactersSchema
           },
           required: ["narrative", "visual_prompt", "characters"],
@@ -190,24 +179,35 @@ export const generateStoryScript = async (
 
   const anchorContext = hasAnchors 
     ? anchors.map(a => `NAME: ${a.name}\nDESC: ${a.description}`).join("\n\n")
-    : "No pre-defined visual anchors.";
+    : "No pre-defined visual anchors. Define characters naturally as needed.";
 
-  const prompt = `
-  Role: Visual Director.
-  Theme: "${theme}". Style: "${artStyle}". Mode: "${mode}".
-  
-  1. Define a "World Anchor".
-  2. Plan scenes. Identify characters.
-  3. Write 'visual_prompt' focusing on ACTION and COMPOSITION.
+  const consistencyInstruction = `
+  【Role: Visual Director】
+  1. Define a "World Anchor" (environment/lighting) that stays consistent throughout the story.
+     - Based on Theme: "${theme}" and Style: "${artStyle}".
+     - It MUST set a unified color palette (e.g., "Teal and Orange") and lighting style (e.g., "Chiaroscuro", "Soft Daylight").
+  2. Plan the scenes. For each scene, identify which characters from the "DEFINED CHARACTERS" list appear.
+  3. Write 'visual_prompt' focusing on ACTION and COMPOSITION (e.g., "Low angle shot, X is running towards camera"). DO NOT describe the character's clothes/face in the 'visual_prompt' because we will inject the "Visual Anchor" programmatically later.
   
   DEFINED CHARACTERS:
   ${anchorContext}
   `;
 
+  let systemInstruction = "";
+  if (mode === 'comic') {
+    systemInstruction = `You are a Comic Script Writer.
+    ${consistencyInstruction}`;
+  } else {
+    systemInstruction = `You are a Storyboard Artist.
+    ${consistencyInstruction}`;
+  }
+
   try {
     const response = await callWithRetry<GenerateContentResponse>(() => ai.models.generateContent({
       model: "gemini-3-pro-preview",
-      contents: { parts: buildMultiModalParts(prompt, characterImages) },
+      contents: {
+         parts: buildMultiModalParts(systemInstruction, characterImages)
+      },
       config: {
         responseMimeType: "application/json",
         responseSchema: responseSchema,
@@ -220,15 +220,11 @@ export const generateStoryScript = async (
 
     const parsed = JSON.parse(text) as StoryData;
     
-    // Safety check for scenes array
-    const safeScenes = Array.isArray(parsed.scenes) ? parsed.scenes : [];
-
-    parsed.scenes = safeScenes.map((scene, index) => ({
+    parsed.scenes = parsed.scenes.map((scene, index) => ({
       ...scene,
       id: index,
       isLoadingImage: true,
-      tags: [],
-      characters: Array.isArray(scene.characters) ? scene.characters : []
+      tags: [] 
     }));
 
     parsed.lastModified = Date.now();
@@ -260,6 +256,8 @@ export const optimizeFullStory = async (
     characters: s.characters
   })));
 
+  const anchorNames = currentStory.visualAnchors?.map(a => a.name).join(", ") || "";
+
   const responseSchema = {
     type: Type.OBJECT,
     properties: {
@@ -279,8 +277,23 @@ export const optimizeFullStory = async (
     required: ["scenes"],
   };
 
-  const prompt = `Optimize script. Theme: ${theme}, Style: ${artStyle}.
-  Current Script: ${currentScriptJSON}
+  const modeInstruction = currentStory.mode === 'comic' 
+    ? "Enhance comic pacing and punchlines."
+    : "Enhance cinematic flow and camera direction.";
+
+  const prompt = `Optimize the story script.
+  Theme: ${theme}
+  Art Style: ${artStyle}
+  
+  Current Script:
+  ${currentScriptJSON}
+  
+  Instructions:
+  1. ${modeInstruction}
+  2. Make narrative engaging (Chinese).
+  3. Enrich visual_prompt (English). Focus on action/camera.
+  4. Ensure 'characters' list correctly identifies who is in the scene${anchorNames ? ` from: [${anchorNames}]` : ''}.
+  
   Return updated scenes.`;
 
   const response = await callWithRetry<GenerateContentResponse>(() => ai.models.generateContent({
@@ -296,31 +309,20 @@ export const optimizeFullStory = async (
   const text = response.text;
   if (!text) throw new Error("No response");
   
-  let parsed: any;
-  try {
-     parsed = JSON.parse(text);
-  } catch (e) {
-     throw new Error("Failed to parse optimization result");
-  }
-
-  if (!parsed || !parsed.scenes || !Array.isArray(parsed.scenes)) {
-     console.warn("Optimization returned invalid structure, reverting to original.");
-     return currentStory.scenes;
-  }
+  const parsed = JSON.parse(text) as { scenes: { narrative: string, visual_prompt: string, characters: string[] }[] };
   
   return currentStory.scenes.map((scene, index) => {
     const optimized = parsed.scenes[index];
-    if (!optimized) return scene; 
-    
     return {
       ...scene,
-      narrative: optimized.narrative || scene.narrative,
-      visual_prompt: optimized.visual_prompt || scene.visual_prompt,
-      characters: optimized.characters || scene.characters
+      narrative: optimized ? optimized.narrative : scene.narrative,
+      visual_prompt: optimized ? optimized.visual_prompt : scene.visual_prompt,
+      characters: optimized ? optimized.characters : scene.characters
     };
   });
 };
 
+// ... generatePlotOptions ... (Unchanged)
 export const generatePlotOptions = async (
   storyContext: Scene[],
   theme: string
@@ -344,7 +346,9 @@ export const generatePlotOptions = async (
   const response = await callWithRetry<GenerateContentResponse>(() => ai.models.generateContent({
     model: "gemini-3-pro-preview",
     contents: {
-      parts: [{ text: `Based on this story (${theme}):\n${contextText}\nProvide 3 interesting plot options (Chinese).` }]
+      parts: [{
+        text: `Based on this story (${theme}):\n${contextText}\nProvide 3 interesting plot options (Chinese).`
+      }]
     },
     config: {
       responseMimeType: "application/json",
@@ -355,12 +359,12 @@ export const generatePlotOptions = async (
 
   const text = response.text;
   if (!text) return [];
-  try {
-     const parsed = JSON.parse(text);
-     return Array.isArray(parsed) ? parsed : [];
-  } catch (e) { return []; }
+  return JSON.parse(text) as PlotOption[];
 };
 
+/**
+ * Extends story. 
+ */
 export const extendStoryScript = async (
   theme: string,
   characterImages: string[],
@@ -383,8 +387,16 @@ export const extendStoryScript = async (
     : "Use previous scene visual prompts as reference for character consistency.";
 
   const charactersSchema = hasAnchors 
-    ? { type: Type.ARRAY, items: { type: Type.STRING }, description: `Must select from: ${anchorNames}` }
-    : { type: Type.ARRAY, items: { type: Type.STRING } };
+    ? { 
+        type: Type.ARRAY, 
+        items: { type: Type.STRING }, 
+        description: `Must select from: ${anchorNames}` 
+      }
+    : { 
+        type: Type.ARRAY, 
+        items: { type: Type.STRING },
+        description: "List of character names."
+      };
 
   const responseSchema = {
     type: Type.OBJECT,
@@ -405,14 +417,29 @@ export const extendStoryScript = async (
     required: ["scenes"],
   };
 
-  const prompt = `Extend story. Theme: "${theme}". Option: "${option}".
-  Current Story: ${contextText}
-  DEFINED CHARACTERS: ${anchorContext}
-  Generate 3-4 new scenes.`;
+  const prompt = `Extend the story.
+  Theme: "${theme}"
+  Style: "${artStyle}"
+  Mode: "${mode}"
+  
+  DEFINED CHARACTERS:
+  ${anchorContext}
+  
+  Current Story: 
+  ${contextText}
+  
+  Direction: "${option}"
+  
+  Generate 3-4 new scenes.
+  1. Use Chinese for narrative.
+  2. Use English for visual_prompt (Action/Composition focus).
+  3. Identify characters present in each scene.`;
 
   const response = await callWithRetry<GenerateContentResponse>(() => ai.models.generateContent({
     model: "gemini-3-pro-preview",
-    contents: { parts: buildMultiModalParts(prompt, characterImages) },
+    contents: {
+      parts: buildMultiModalParts(prompt, characterImages)
+    },
     config: {
       responseMimeType: "application/json",
       responseSchema: responseSchema,
@@ -425,7 +452,7 @@ export const extendStoryScript = async (
   
   const parsed = JSON.parse(text) as { scenes: Omit<Scene, 'id'>[] };
   
-  return (parsed.scenes || []).map((s, i) => ({
+  return parsed.scenes.map((s, i) => ({
     ...s,
     id: startId + i,
     isLoadingImage: true,
@@ -433,6 +460,9 @@ export const extendStoryScript = async (
   }));
 };
 
+/**
+ * Generates a single scene image using the "Refined Sandwich Prompt" method.
+ */
 export const generateSceneImage = async (
   visualPrompt: string,
   characterImages: string[],
@@ -441,31 +471,39 @@ export const generateSceneImage = async (
   mode: GenerationMode,
   worldAnchor?: string,
   sceneAnchors?: VisualAnchor[],
-  feedback?: ImageFeedback,
+  feedback?: string,
   seed?: number
 ): Promise<string> => {
   const ai = getAIClient();
 
   try {
     const styleInstruction = mode === 'comic' 
-      ? `STYLE: Comic Book / Manga Panel. ${artStyle}. Bold outlines.`
-      : `STYLE: Cinematic Movie Still. ${artStyle}. 8K resolution.`;
+      ? `STYLE: Comic Book / Manga Panel. ${artStyle}. Bold outlines, flat colors, expressive shading.`
+      : `STYLE: Cinematic Movie Still. ${artStyle}. 8K resolution, detailed textures, cinematic lighting.`;
 
+    // --- SMART IMAGE SELECTION ---
+    // Instead of sending ALL character images, only send the ones relevant to the characters in this scene.
+    // This reduces noise and helps the model focus on the correct identities.
+    
     let imagesToSend = characterImages;
     let imageReferenceText = "";
 
+    // If sceneAnchors are provided (meaning we know who is in the scene):
     if (sceneAnchors !== undefined) {
+       // Filter images to strictly match the anchors present
        const relevantIndices = [...new Set(sceneAnchors.map(a => a.previewImageIndex).filter(i => i !== undefined && i !== null && i >= 0))];
        
        if (relevantIndices.length > 0) {
+          // Map old indices to new sequential indices (1, 2, 3...) for the prompt
           const newImages: string[] = [];
           const anchorReferenceLines: string[] = [];
           const indexMapping = new Map<number, number>();
 
           relevantIndices.forEach((oldIndex) => {
+             // Validate index bounds
              if (oldIndex >= 0 && oldIndex < characterImages.length) {
                 newImages.push(characterImages[oldIndex]);
-                indexMapping.set(oldIndex, newImages.length); 
+                indexMapping.set(oldIndex, newImages.length); // Store 1-based index
              }
           });
 
@@ -481,44 +519,58 @@ export const generateSceneImage = async (
              imageReferenceText = "\n**REFERENCE IMAGE MAPPING**:\n" + anchorReferenceLines.join("\n");
           }
        } else {
+          // If scene has anchors but no valid images found (unlikely), or sceneAnchors is empty list (no characters).
+          // If no characters are in the scene (empty sceneAnchors), we send NO images to avoid face hallucinations in landscapes.
           imagesToSend = [];
        }
     }
 
+    // --- REFINED PROMPT INJECTION (SANDWICH METHOD V2) ---
+    // Top Bun: Global Style & World Anchor
+    // Meat: Character Anchors (Detailed) + Image Mappings
+    // Lettuce: Scene Action
+    // Bottom Bun: Negative Constraints & Reinforcement
+
     const anchorSection = sceneAnchors && sceneAnchors.length > 0 
        ? sceneAnchors.map(a => `   - **${a.name}**: ${a.description}`).join('\n') 
-       : "   - No specific character focus.";
+       : "   - No specific character focus. Use generic background characters fitting the style if needed.";
 
     let sandwichPrompt = `
-    *** VISUAL CONSISTENCY PROTOCOL ***
+    *** IMAGE GENERATION ORDER ***
     
-    [PHASE 1: WORLD SETTING]
+    STEP 1: SET THE SCENE (WORLD ANCHOR)
     - Visual Style: ${styleInstruction}
-    - World Anchor: ${worldAnchor || "Consistent cinematic atmosphere."}
+    - Global Atmosphere & Lighting: ${worldAnchor || "Consistent cinematic atmosphere suitable for the theme. Cohesive color palette."}
     
-    [PHASE 2: CHARACTER DEFINITION]
+    STEP 2: APPLY CHARACTER DESIGNS (VISUAL ANCHORS)
     ${imageReferenceText}
-    ${imageReferenceText ? "STRICT INSTRUCTION: The provided Reference Images are the GROUND TRUTH." : ""}
-    
-    Present Characters:
+    ${imageReferenceText ? "For the characters listed above, you MUST use the provided reference image ID as the primary source for their facial features and clothing." : ""}
+    The following characters have strict visual definitions. You MUST adhere to these descriptions if they appear in the action:
     ${anchorSection}
 
-    [PHASE 3: SCENE COMPOSITION]
-    Action Prompt: ${visualPrompt}
+    STEP 3: EXECUTE ACTION
+    ${visualPrompt}
     
-    [PHASE 4: QUALITY CONTROL]
-    - ${mode === 'comic' ? 'Clean line art. No text.' : 'Photorealistic. No text.'}
+    *** CRITICAL CONSTRAINTS ***
+    ${imageReferenceText ? "- Check the Reference Images: They are the ground truth for character identity." : ""}
+    - Consistency Check: Ensure characters maintain their defined clothes and facial features from Step 2.
+    - ${mode === 'comic' ? 'Do NOT generate speech bubbles or text boxes. Clean art.' : 'No text overlays. Photorealistic.'}
     `;
 
     if (feedback) {
-      sandwichPrompt += `\n\n[PHASE 5: REVISION]: ${feedback.type.toUpperCase()}: "${feedback.text}".`;
+      sandwichPrompt += `\n\nUSER FEEDBACK: "${feedback}". Update image accordingly while keeping anchors intact.`;
     }
     
     const response = await callWithRetry<GenerateContentResponse>(() => ai.models.generateContent({
       model: "gemini-3-pro-image-preview",
-      contents: { parts: buildMultiModalParts(sandwichPrompt, imagesToSend) },
+      contents: {
+        parts: buildMultiModalParts(sandwichPrompt, imagesToSend),
+      },
       config: {
-        imageConfig: { aspectRatio: aspectRatio, imageSize: "2K" },
+        imageConfig: {
+          aspectRatio: aspectRatio,
+          imageSize: "2K", 
+        },
         // @ts-ignore
         seed: seed,
         safetySettings: SAFETY_SETTINGS,
@@ -539,16 +591,19 @@ export const generateSceneImage = async (
   }
 };
 
+// ... generateStylePreview ...
 export const generateStylePreview = async (styleLabel: string, styleDesc: string): Promise<string> => {
   const ai = getAIClient();
   try {
-    const prompt = `Sample art style: ${styleLabel}. ${styleDesc}. Epic landscape. No text.`;
+    const prompt = `Sample art style: ${styleLabel}. ${styleDesc}. Epic landscape, hero silhouette. No text. High quality, detailed.`;
     const response = await callWithRetry<GenerateContentResponse>(() => ai.models.generateContent({
-      model: "gemini-2.5-flash-image",
+      model: "gemini-2.5-flash-image", // Using flash-image for faster previews
       contents: { parts: [{ text: prompt }] },
       config: { 
          safetySettings: SAFETY_SETTINGS,
-         imageConfig: { aspectRatio: '16:9' }
+         imageConfig: {
+            aspectRatio: '16:9',
+         }
       }
     }));
     for (const part of response.candidates?.[0]?.content?.parts || []) {
@@ -560,6 +615,7 @@ export const generateStylePreview = async (styleLabel: string, styleDesc: string
   }
 };
 
+// ... generateCharacterDesign ... (Unchanged)
 export const generateCharacterDesign = async (desc: string, sketch: string | null, style: ArtStyle, ratio: AspectRatio): Promise<string> => {
     const ai = getAIClient();
     try {
@@ -580,6 +636,7 @@ export const generateCharacterDesign = async (desc: string, sketch: string | nul
     } catch (e) { throw e; }
 };
 
+// ... generateSpeech ... (Unchanged)
 const createWavUrl = (pcmData: Uint8Array): string => {
   const PCM_SAMPLE_RATE = 24000;
   const wavHeader = new ArrayBuffer(44);
@@ -614,39 +671,32 @@ export const generateSpeech = async (text: string): Promise<string> => {
     return createWavUrl(bytes);
 };
 
+// ... generateSceneVideo ... (Unchanged)
 export const generateSceneVideo = async (imageUrl: string, prompt: string): Promise<{ url: string, cost: string }> => {
     const ai = getAIClient();
     try {
-        if (!imageUrl) throw new Error("Image required for video generation");
         const match = imageUrl.match(/^data:(.+);base64,(.+)$/);
-        if (!match) throw new Error("Invalid image format");
-        
-        const apiKey = localStorage.getItem("gemini_api_key") || (typeof process !== 'undefined' ? process.env.API_KEY : '') || '';
-        
+        if (!match) throw new Error("Invalid image");
+        const apiKey = localStorage.getItem("gemini_api_key") || process.env.API_KEY;
         let op = await ai.models.generateVideos({
             model: 'veo-3.1-fast-generate-preview',
             prompt: prompt + " Cinematic movement.",
             image: { imageBytes: match[2], mimeType: match[1] },
             config: { numberOfVideos: 1, resolution: '720p', aspectRatio: '16:9' }
         });
-        
         while (!op.done) {
             await new Promise(r => setTimeout(r, 5000));
             op = await ai.operations.getVideosOperation({operation: op});
         }
-        
         const uri = op.response?.generatedVideos?.[0]?.video?.uri;
-        if (!uri) throw new Error("No video returned");
-        
+        if (!uri) throw new Error("No video");
         const res = await fetch(`${uri}&key=${apiKey}`);
         if (!res.ok) throw new Error("Download failed");
         return { url: URL.createObjectURL(await res.blob()), cost: "$0.0375" };
-    } catch (e) { 
-        console.error(e); 
-        throw e; 
-    }
+    } catch (e) { console.error(e); throw e; }
 };
 
+// ... polishText ... (Unchanged)
 export const polishText = async (text: string, type: 'narrative' | 'visual'): Promise<string> => {
     const ai = getAIClient();
     const prompt = type === 'narrative' 
@@ -660,6 +710,7 @@ export const polishText = async (text: string, type: 'narrative' | 'visual'): Pr
     return res.text || text;
 };
 
+// ... checkApiKey & openApiKeySelector ... (Unchanged)
 export const checkApiKey = async (): Promise<boolean> => {
     if (localStorage.getItem("gemini_api_key")) return true;
     const win = window as any;

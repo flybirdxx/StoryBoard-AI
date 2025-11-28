@@ -30,7 +30,6 @@ export interface StoryData {
   seed?: number;         // Global seed for consistency
   visualAnchors?: VisualAnchor[]; // Persisted anchors for this story
   worldAnchor?: string; // Global environment/lighting description (World Anchor)
-  referenceImages?: string[]; // Persisted reference images to allow character consistency across reloads
 }
 
 export interface PlotOption {
@@ -44,11 +43,6 @@ export interface Character {
   name: string;
   description: string;
   imageUrl: string;
-}
-
-export interface ImageFeedback {
-  type: 'general' | 'lighting' | 'composition' | 'character' | 'style';
-  text: string;
 }
 
 export type ArtStyle = 
