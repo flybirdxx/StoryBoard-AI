@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { Upload, Sparkles, Image as ImageIcon, X, Palette, Plus, Users, PenTool, LayoutTemplate, Square, Monitor, Wand2, Paintbrush, ChevronDown, Check, Loader2, AlertCircle } from 'lucide-react';
 import { ArtStyle, GenerationMode, AspectRatio, Character } from '../types';
@@ -30,6 +31,7 @@ export const ART_STYLE_OPTIONS: ArtStyleOption[] = [
   { id: '极简线条', label: '极简线条', desc: '黑白线稿，高雅且抽象', fallbackGradient: 'from-gray-200 to-white' },
   { id: '复古像素', label: '复古像素', desc: '8-bit 电子游戏怀旧风格', fallbackGradient: 'from-indigo-600 to-purple-600' },
   { id: '印象派油画', label: '印象派油画', desc: '浓墨重彩，梵高式笔触', fallbackGradient: 'from-yellow-700 to-blue-800' },
+  { id: 'custom', label: '自定义风格', desc: '手动输入艺术风格提示词', fallbackGradient: 'from-slate-800 to-zinc-900' },
 ];
 
 const ASPECT_RATIOS: AspectRatio[] = ['16:9', '9:16', '1:1', '4:3', '3:4'];
@@ -38,33 +40,14 @@ const StoryForm: React.FC<StoryFormProps> = ({ onSubmit, isGenerating, savedChar
   const [theme, setTheme] = useState('');
   const [images, setImages] = useState<string[]>([]);
   const [selectedStyle, setSelectedStyle] = useState<ArtStyle>('电影写实');
+  const [customStyleInput, setCustomStyleInput] = useState('');
   const [showWorkshop, setShowWorkshop] = useState(false);
   
-  // Style Dropdown State
-  const [isStyleOpen, setIsStyleOpen] = useState(false);
-  const [hoveredStyle, setHoveredStyle] = useState<ArtStyle | null>(null);
-  
-  // Preview Image Cache & Loading State
-  const [previewCache, setPreviewCache] = useState<Record<string, string>>({});
-  const [previewErrors, setPreviewErrors] = useState<Record<string, boolean>>({});
-  const [isLoadingPreview, setIsLoadingPreview] = useState(false);
-
   // New State for Mode and Ratio
   const [mode, setMode] = useState<GenerationMode>('storyboard');
   const [aspectRatio, setAspectRatio] = useState<AspectRatio>('16:9');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsStyleOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
 
   useEffect(() => {
     if (mode === 'storyboard') {
@@ -73,25 +56,6 @@ const StoryForm: React.FC<StoryFormProps> = ({ onSubmit, isGenerating, savedChar
       setAspectRatio('4:3'); 
     }
   }, [mode]);
-
-  const activeStyleId = hoveredStyle || selectedStyle;
-  const activeStyleOption = ART_STYLE_OPTIONS.find(opt => opt.id === activeStyleId) || ART_STYLE_OPTIONS[0];
-
-  useEffect(() => {
-    const fetchPreview = async () => {
-      if (previewCache[activeStyleId] || previewErrors[activeStyleId] || isLoadingPreview) return;
-      setIsLoadingPreview(true);
-      try {
-        const url = await generateStylePreview(activeStyleOption.label, activeStyleOption.desc);
-        setPreviewCache(prev => ({ ...prev, [activeStyleId]: url }));
-      } catch (error) {
-        setPreviewErrors(prev => ({ ...prev, [activeStyleId]: true }));
-      } finally {
-        setIsLoadingPreview(false);
-      }
-    };
-    if (isStyleOpen) fetchPreview();
-  }, [activeStyleId, isStyleOpen, activeStyleOption]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -114,7 +78,15 @@ const StoryForm: React.FC<StoryFormProps> = ({ onSubmit, isGenerating, savedChar
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (theme && images.length > 0) onSubmit(theme, images, selectedStyle, mode, aspectRatio);
+    let finalStyle = selectedStyle;
+    if (selectedStyle === 'custom') {
+        if (!customStyleInput.trim()) {
+           alert("请输入自定义风格描述");
+           return;
+        }
+        finalStyle = customStyleInput.trim();
+    }
+    if (theme && images.length > 0) onSubmit(theme, images, finalStyle, mode, aspectRatio);
   };
 
   return (
@@ -164,47 +136,64 @@ const StoryForm: React.FC<StoryFormProps> = ({ onSubmit, isGenerating, savedChar
                 </div>
              </div>
 
-             {/* Style Card */}
-             <div className="bg-[#13161f] border border-white/5 rounded-2xl p-6 shadow-xl space-y-4" ref={dropdownRef}>
+             {/* Style Card - Grid Layout Redesign */}
+             <div className="bg-[#13161f] border border-white/5 rounded-2xl p-6 shadow-xl space-y-4">
                 <div className="flex items-center gap-2 mb-2">
                    <Palette className="w-4 h-4 text-purple-400" />
                    <h3 className="text-sm font-bold text-white uppercase tracking-wider">艺术风格</h3>
                 </div>
                 
-                <div className="relative">
-                   <button type="button" onClick={() => setIsStyleOpen(!isStyleOpen)} className="w-full bg-black/20 border border-white/10 hover:border-indigo-500/30 text-white rounded-xl px-4 py-4 flex items-center justify-between transition-all group hover:bg-black/30">
-                     <div className="flex flex-col items-start gap-1">
-                       <span className="text-base font-bold tracking-wide">{selectedStyle}</span>
-                       <span className="text-xs text-slate-500">{activeStyleOption.desc}</span>
-                     </div>
-                     <ChevronDown className={`w-5 h-5 text-slate-500 transition-transform duration-300 ${isStyleOpen ? 'rotate-180' : ''}`} />
-                   </button>
-
-                   {isStyleOpen && (
-                     <div className="absolute left-0 right-0 top-full mt-2 z-50 bg-[#151921] border border-white/10 rounded-xl shadow-2xl overflow-hidden animate-in zoom-in-95 ring-1 ring-black/50">
-                        <div className="flex flex-col md:flex-row h-[320px]">
-                           <div className="w-full md:w-1/2 overflow-y-auto custom-scrollbar bg-[#0F121A]">
-                              {ART_STYLE_OPTIONS.map((style) => (
-                                 <button key={style.id} type="button" onClick={() => { setSelectedStyle(style.id); setIsStyleOpen(false); }} onMouseEnter={() => setHoveredStyle(style.id)} onMouseLeave={() => setHoveredStyle(null)} className={`w-full px-4 py-3 text-left flex items-center justify-between border-b border-white/5 transition-all ${selectedStyle === style.id ? 'bg-indigo-500/10 text-white' : 'text-slate-400 hover:bg-white/5'}`}>
-                                    <div><p className={`text-xs font-bold ${selectedStyle === style.id ? 'text-indigo-400' : ''}`}>{style.label}</p></div>
-                                    {selectedStyle === style.id && <Check className="w-3.5 h-3.5 text-indigo-400" />}
-                                 </button>
-                              ))}
-                           </div>
-                           <div className="hidden md:flex w-1/2 bg-black flex-col relative overflow-hidden">
-                              {previewCache[activeStyleId] ? (
-                                 <img src={previewCache[activeStyleId]} className="absolute inset-0 w-full h-full object-cover animate-in fade-in" />
-                              ) : (
-                                 <div className={`absolute inset-0 bg-gradient-to-br ${activeStyleOption.fallbackGradient} opacity-50 flex items-center justify-center`}>{isLoadingPreview && <Loader2 className="w-6 h-6 animate-spin text-white/50" />}</div>
-                              )}
-                              <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/90 to-transparent">
-                                 <p className="text-white font-bold text-sm">{activeStyleOption.label}</p>
-                              </div>
-                           </div>
-                        </div>
-                     </div>
-                   )}
+                {/* Style Grid */}
+                <div className="grid grid-cols-2 gap-2.5">
+                   {ART_STYLE_OPTIONS.map((style) => (
+                      <button
+                        key={style.id}
+                        type="button"
+                        onClick={() => setSelectedStyle(style.id)}
+                        className={`relative p-3 rounded-xl border text-left transition-all overflow-hidden group flex flex-col justify-between h-20 ${
+                           selectedStyle === style.id 
+                             ? 'bg-indigo-500/10 border-indigo-500/50 ring-1 ring-indigo-500/20' 
+                             : 'bg-black/20 border-white/5 hover:border-white/20 hover:bg-white/5'
+                        }`}
+                      >
+                         {/* Gradient Accent - Top Bar */}
+                         <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${style.fallbackGradient} opacity-60 group-hover:opacity-100 transition-opacity`} />
+                         
+                         <div className="mt-1">
+                             <div className="flex items-center justify-between">
+                                <span className={`text-xs font-bold block mb-0.5 ${selectedStyle === style.id ? 'text-white' : 'text-slate-400 group-hover:text-slate-200'}`}>
+                                    {style.label}
+                                </span>
+                                {selectedStyle === style.id && (
+                                   <div className="w-1.5 h-1.5 rounded-full bg-indigo-400 shadow-[0_0_6px_rgba(129,140,248,1)]"></div>
+                                )}
+                             </div>
+                             <span className="text-[9px] text-slate-600 leading-tight block line-clamp-2 pr-1">
+                                 {style.desc}
+                             </span>
+                         </div>
+                      </button>
+                   ))}
                 </div>
+
+                {/* Custom Style Input */}
+                {selectedStyle === 'custom' && (
+                  <div className="animate-in fade-in slide-in-from-top-2 pt-2 bg-black/20 rounded-xl p-3 border border-white/5">
+                     <label className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider mb-2 block flex items-center gap-2">
+                        <Wand2 className="w-3 h-3" />
+                        输入自定义风格提示词
+                     </label>
+                     <textarea
+                        value={customStyleInput}
+                        onChange={(e) => setCustomStyleInput(e.target.value)}
+                        placeholder="例如：梵高星空风格，厚涂油画，蓝色与黄色主调，笔触明显..."
+                        className="w-full bg-black/40 border border-white/10 rounded-lg p-2.5 text-xs text-white placeholder-slate-600 focus:ring-1 focus:ring-indigo-500 outline-none resize-none shadow-inner"
+                        rows={3}
+                        autoFocus
+                     />
+                     <p className="text-[10px] text-slate-500 mt-2">* 越详细的描述，AI 越能准确捕捉您想要的艺术氛围。</p>
+                  </div>
+                )}
              </div>
           </div>
 

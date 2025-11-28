@@ -22,6 +22,7 @@ const CharacterWorkshop: React.FC<CharacterWorkshopProps> = ({ onClose, onSave }
   const [tool, setTool] = useState<'pen' | 'eraser'>('pen');
   const [aspectRatio, setAspectRatio] = useState<AspectRatio>('1:1');
   const [artStyle, setArtStyle] = useState<ArtStyle>('电影写实');
+  const [customStyle, setCustomStyle] = useState('');
 
   // Initialize canvas
   useEffect(() => {
@@ -92,10 +93,19 @@ const CharacterWorkshop: React.FC<CharacterWorkshopProps> = ({ onClose, onSave }
       return;
     }
 
+    let styleToUse = artStyle;
+    if (artStyle === 'custom') {
+       if (!customStyle.trim()) {
+         alert("请输入自定义风格描述");
+         return;
+       }
+       styleToUse = customStyle.trim();
+    }
+
     setIsGenerating(true);
     try {
       const sketchData = canvasRef.current?.toDataURL('image/jpeg', 0.8) || null;
-      const imageUrl = await generateCharacterDesign(prompt, sketchData, artStyle, aspectRatio);
+      const imageUrl = await generateCharacterDesign(prompt, sketchData, styleToUse, aspectRatio);
       setGeneratedImage(imageUrl);
     } catch (error) {
       console.error("Failed to generate character", error);
@@ -191,6 +201,19 @@ const CharacterWorkshop: React.FC<CharacterWorkshopProps> = ({ onClose, onSave }
                         </select>
                      </div>
                  </div>
+
+                 {artStyle === 'custom' && (
+                   <div className="animate-in fade-in slide-in-from-top-2">
+                      <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 block">自定义风格</label>
+                      <input 
+                        type="text" 
+                        value={customStyle}
+                        onChange={(e) => setCustomStyle(e.target.value)}
+                        className="w-full bg-black/30 border border-white/10 rounded-xl p-3 text-white placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                        placeholder="例如：哥特式黑暗风格..."
+                      />
+                   </div>
+                 )}
 
                  <div>
                     <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 block">外观描述</label>

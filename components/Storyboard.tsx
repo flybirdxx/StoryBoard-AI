@@ -405,13 +405,17 @@ const SceneCard: React.FC<{
      return (
         <div className={`group/card h-full flex flex-col relative bg-transparent transition-all duration-300 ${isSelected ? 'ring-4 ring-indigo-500/50' : ''}`}>
            {/* Comic Panel Container */}
-           <div className="flex-1 border-4 border-black bg-white shadow-[8px_8px_0px_rgba(0,0,0,1)] relative overflow-hidden flex flex-col">
+           <div className={`flex-1 border-4 bg-white shadow-[8px_8px_0px_rgba(0,0,0,1)] relative overflow-hidden flex flex-col transition-colors duration-300 ${isSelected ? 'border-indigo-600' : 'border-black'}`}>
               
               {/* Image Area */}
               <div className="relative flex-1 bg-slate-100 min-h-[200px] overflow-hidden">
                  {scene.imageUrl ? (
                     <>
-                       <img src={scene.imageUrl} alt={`Panel ${index + 1}`} className="w-full h-full object-cover transition-transform duration-700 hover:scale-105" />
+                       <img 
+                          src={scene.imageUrl} 
+                          alt={`Panel ${index + 1}`} 
+                          className={`w-full h-full object-cover transition-transform duration-700 ease-out ${isSelected ? 'scale-110' : 'hover:scale-105'}`} 
+                        />
                        {!scene.isLoadingImage && !isEditingText && <SubtitleOverlay text={scene.narrative} mode={mode} />}
                     </>
                  ) : (
@@ -471,7 +475,7 @@ const SceneCard: React.FC<{
            </div>
            
            {/* Panel Number */}
-           <div className="absolute -top-3 -left-3 w-8 h-8 bg-black text-white rounded-full flex items-center justify-center font-black text-sm border-2 border-white shadow-lg z-20">
+           <div className={`absolute -top-3 -left-3 w-8 h-8 rounded-full flex items-center justify-center font-black text-sm border-2 shadow-lg z-20 transition-colors ${isSelected ? 'bg-indigo-600 text-white border-white' : 'bg-black text-white border-white'}`}>
               {index + 1}
            </div>
         </div>

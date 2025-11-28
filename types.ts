@@ -45,18 +45,7 @@ export interface Character {
   imageUrl: string;
 }
 
-export type ArtStyle = 
-  | '电影写实'
-  | '美式漫画'
-  | '日本动漫'
-  | '水彩画'
-  | '赛博朋克'
-  | '蒸汽朋克'
-  | '黑暗奇幻'
-  | '皮克斯3D风格'
-  | '极简线条'
-  | '复古像素'
-  | '印象派油画';
+export type ArtStyle = string;
 
 export type GenerationMode = 'storyboard' | 'comic';
 
