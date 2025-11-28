@@ -1,67 +1,21 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>AI Storyboard Creator</title>
+    <title>StoryBoard AI - Gemini 3 Pro</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet">
-    <script>
-      tailwind.config = {
-        theme: {
-          extend: {
-            fontFamily: {
-              sans: ['"Inter"', '"Noto Sans SC"', 'sans-serif'],
-            },
-            colors: {
-              app: {
-                bg: '#0B0E14', // Main background
-                sidebar: '#0F1218', // Sidebar
-                card: '#151923', // Card background
-                accent: '#8B5CF6', // Purple accent
-                accentHover: '#7C3AED',
-                text: '#E5E7EB', // Main text
-                muted: '#9CA3AF', // Muted text
-                border: '#2D3748',
-              }
-            }
-          }
-        }
-      }
-    </script>
-    <style>
-      body {
-        background-color: #0B0E14;
-        color: #E5E7EB;
-      }
-      /* Custom Scrollbar */
-      ::-webkit-scrollbar {
-        width: 6px;
-        height: 6px;
-      }
-      ::-webkit-scrollbar-track {
-        background: #0F1218; 
-      }
-      ::-webkit-scrollbar-thumb {
-        background: #2D3748; 
-        border-radius: 3px;
-      }
-      ::-webkit-scrollbar-thumb:hover {
-        background: #4B5563; 
-      }
-    </style>
   <script type="importmap">
 {
   "imports": {
-    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
-    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.555.0",
-    "react/": "https://aistudiocdn.com/react@^19.2.0/",
     "react": "https://aistudiocdn.com/react@^19.2.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
     "@google/genai": "https://aistudiocdn.com/@google/genai@^1.30.0",
-    "zustand": "https://aistudiocdn.com/zustand@^5.0.0",
-    "zustand/vanilla": "https://aistudiocdn.com/zustand@^5.0.0/vanilla",
-    "zustand/react": "https://aistudiocdn.com/zustand@^5.0.0/react",
-    "react-router-dom": "https://aistudiocdn.com/react-router-dom@^6.22.0"
+    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.554.0",
+    "jspdf": "https://esm.sh/jspdf@2.5.1",
+    "jszip": "https://esm.sh/jszip@3.10.1",
+    "file-saver": "https://esm.sh/file-saver@2.0.5"
   }
 }
 </script>

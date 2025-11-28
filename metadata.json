@@ -1,5 +1,5 @@
 {
-  "name": "AI Storyboard Creator",
-  "description": "A professional AI video creation tool that converts scripts into detailed storyboards with visual prompts and camera directions using Gemini.",
+  "name": "StoryBoard AI - Gemini 3 Pro (中文版)",
+  "description": "使用 Gemini 3 Pro 进行剧本编写，并使用 Gemini 3 Pro Image (Banana Pro) 根据多角色参考图生成连贯的分镜故事。",
   "requestFramePermissions": []
 }

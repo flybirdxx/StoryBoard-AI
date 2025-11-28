@@ -1,70 +1,75 @@
-export enum GenerationStatus {
-  IDLE = 'IDLE',
-  LOADING = 'LOADING',
-  SUCCESS = 'SUCCESS',
-  ERROR = 'ERROR'
-}
-
-export type ImageStyle = 
-  | 'Cinematic' 
-  | 'Anime' 
-  | '3D Render' 
-  | 'Watercolor' 
-  | 'Cyberpunk' 
-  | 'Sketch' 
-  | 'Film Noir' 
-  | 'Wes Anderson' 
-  | 'Studio Ghibli' 
-  | 'Retro Sci-Fi' 
-  | 'Comic Book';
-
-export type TransitionType = 'CUT' | 'FADE' | 'DISSOLVE' | 'WIPE';
-
-export interface Shot {
-  id: number;
-  shotNumber: number;
-  type: string; // e.g., Narrative, Dialogue
-  cameraMove: string; // e.g., Slow Pan, Close-up
-  visualPrompt: string;
-  description: string;
-  imageUrl?: string;
-  isLoading?: boolean;
-  duration?: number; // Duration in seconds
-  transition?: TransitionType;
-}
 
 export interface Scene {
   id: number;
-  title: string;
-  description: string;
-  shots: Shot[];
+  visual_prompt: string;
+  narrative: string;
+  imageUrl?: string;
+  isLoadingImage?: boolean;
+  audioUrl?: string;
+  isLoadingAudio?: boolean;
+  videoUrl?: string;
+  videoCost?: string; // Estimated cost of the generated video
+  isLoadingVideo?: boolean;
+  tags?: string[]; // Custom tags for organization
+  characters?: string[]; // Names of characters appearing in this scene
 }
 
-export interface Asset {
+export interface VisualAnchor {
   id: string;
   name: string;
-  type: 'Character' | 'Prop' | 'Scene';
-  imageUrl: string;
+  description: string;
+  previewImageIndex?: number; // Index in the originalImages array
+}
+
+export interface StoryData {
+  title: string;
+  scenes: Scene[];
+  lastModified?: number; // Timestamp for history
+  actionType?: string;   // Description of the action (e.g., "Generated Story", "Modified Scene 2")
+  mode: GenerationMode;  // Persist the mode for UI rendering logic
+  seed?: number;         // Global seed for consistency
+  visualAnchors?: VisualAnchor[]; // Persisted anchors for this story
+  worldAnchor?: string; // Global environment/lighting description (World Anchor)
+  referenceImages?: string[]; // Persisted reference images to allow character consistency across reloads
+}
+
+export interface PlotOption {
+  id: string;
+  title: string;
   description: string;
 }
 
-export interface DetectedCharacter {
+export interface Character {
+  id: string;
   name: string;
   description: string;
-  role: string;
+  imageUrl: string;
 }
 
-export interface ScriptAnalysis {
-  expandedScript: string;
-  characters: DetectedCharacter[];
-  synopsis: string;
+export interface ImageFeedback {
+  type: 'general' | 'lighting' | 'composition' | 'character' | 'style';
+  text: string;
 }
 
-export enum NavItem {
-  SCRIPT = 'SCRIPT',
-  CHARACTERS = 'CHARACTERS',
-  STORYBOARD = 'STORYBOARD',
-  TIMELINE = 'TIMELINE',
-  ASSETS = 'ASSETS',
-  SUBSCRIPTION = 'SUBSCRIPTION'
+export type ArtStyle = 
+  | '电影写实'
+  | '美式漫画'
+  | '日本动漫'
+  | '水彩画'
+  | '赛博朋克'
+  | '蒸汽朋克'
+  | '黑暗奇幻'
+  | '皮克斯3D风格'
+  | '极简线条'
+  | '复古像素'
+  | '印象派油画';
+
+export type GenerationMode = 'storyboard' | 'comic';
+
+export type AspectRatio = '16:9' | '9:16' | '1:1' | '4:3' | '3:4';
+
+export interface ExportConfig {
+  format: 'pdf' | 'zip' | 'long-image';
+  resolution: 'screen' | 'original'; // screen = 720p approx, original = generated size
+  withText: boolean; // Burn text into image
 }

@@ -1,87 +1,670 @@
-import React, { useEffect, useState } from 'react';
-import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { Layout } from './components/Layout';
-import { ScriptEditor } from './components/ScriptEditor';
-import { CharacterLibrary } from './components/CharacterLibrary';
-import { StoryboardView } from './components/StoryboardView';
-import { TimelineView } from './components/TimelineView';
-import { useAppStore } from './store/useAppStore';
-import { Key, ChevronRight } from 'lucide-react';
 
-export default function App() {
-  const { isApiKeyValid, setIsApiKeyValid } = useAppStore();
-  const [isCheckingKey, setIsCheckingKey] = useState(true);
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { checkApiKey, generateStoryScript, generateSceneImage, generatePlotOptions, extendStoryScript, generateSpeech, polishText, generateSceneVideo, optimizeFullStory, analyzeCharacterVisuals } from './services/geminiService';
+import { storageService } from './services/storageService';
+import { exportScenes } from './services/exportService';
+import StoryForm from './components/StoryForm';
+import Storyboard from './components/Storyboard';
+import ApiKeySelector from './components/ApiKeySelector';
+import AnchorReviewModal from './components/AnchorReviewModal';
+
+import { StoryData, Scene, PlotOption, ArtStyle, ExportConfig, GenerationMode, AspectRatio, Character, VisualAnchor, ImageFeedback } from './types';
+import { Loader2, Film, Layout, Sparkles, Save as SaveIcon } from 'lucide-react';
+
+const App: React.FC = () => {
+  const [hasKey, setHasKey] = useState<boolean>(false);
+  const [showSettings, setShowSettings] = useState(false);
+  
+  // Navigation State
+  const [currentView, setCurrentView] = useState<ViewType>('create');
+
+  const [story, setStory] = useState<StoryData | null>(null);
+  const [isScriptLoading, setIsScriptLoading] = useState(false);
+  const [originalImages, setOriginalImages] = useState<string[]>([]);
+  const [theme, setTheme] = useState<string>("");
+  const [currentStyle, setCurrentStyle] = useState<ArtStyle>('电影写实');
+  const [currentMode, setCurrentMode] = useState<GenerationMode>('storyboard');
+  const [currentRatio, setCurrentRatio] = useState<AspectRatio>('16:9');
+  
+  // Anchor Review Logic
+  const [showAnchorModal, setShowAnchorModal] = useState(false);
+  const [detectedAnchors, setDetectedAnchors] = useState<VisualAnchor[]>([]);
+  const [isAnalyzingAnchors, setIsAnalyzingAnchors] = useState(false);
+
+  // Custom Character State
+  const [savedCharacters, setSavedCharacters] = useState<Character[]>([]);
+
+  // Branching states
+  const [plotOptions, setPlotOptions] = useState<PlotOption[]>([]);
+  const [isLoadingOptions, setIsLoadingOptions] = useState(false);
+  const [isExtendingStory, setIsExtendingStory] = useState(false);
+  const [isOptimizingStory, setIsOptimizingStory] = useState(false);
+
+  // History State
+  const [history, setHistory] = useState<StoryData[]>([]);
+  const [historyIndex, setHistoryIndex] = useState(-1);
+
+  // Auto-Save State
+  const [isSaving, setIsSaving] = useState(false);
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    const checkKey = async () => {
-      try {
-        if ((window as any).aistudio) {
-          const hasKey = await (window as any).aistudio.hasSelectedApiKey();
-          setIsApiKeyValid(hasKey);
-        } else {
-          // Dev fallback
-          setIsApiKeyValid(true);
-        }
-      } catch (e) {
-        console.error("Failed to check API key", e);
-        setIsApiKeyValid(false);
-      } finally {
-        setIsCheckingKey(false);
-      }
-    };
-    checkKey();
+    verifyKey();
+    loadDraft();
   }, []);
 
-  const handleSelectKey = async () => {
-    if ((window as any).aistudio && (window as any).aistudio.openSelectKey) {
-      await (window as any).aistudio.openSelectKey();
-      setIsApiKeyValid(true);
+  useEffect(() => {
+    if (story) {
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+      setIsSaving(true);
+      saveTimeoutRef.current = setTimeout(async () => {
+         await storageService.saveDraft(story);
+         setIsSaving(false);
+      }, 2000); 
+    }
+  }, [story]);
+
+  // When story is created/loaded, ensure we can access editor
+  useEffect(() => {
+    if (story && currentView === 'create') {
+      setCurrentView('editor');
+    }
+  }, [story]);
+
+  const loadDraft = async () => {
+    const draft = await storageService.loadDraft();
+    if (draft) {
+      setStory(draft);
+      setHistory([draft]);
+      setHistoryIndex(0);
+      setTheme(draft.title); 
+      setCurrentMode(draft.mode);
+      if (draft.visualAnchors) {
+         setDetectedAnchors(draft.visualAnchors);
+      }
+      // Restore reference images from persistent storage
+      if (draft.referenceImages && draft.referenceImages.length > 0) {
+         setOriginalImages(draft.referenceImages);
+      }
+      setCurrentView('editor');
     }
   };
 
-  if (isCheckingKey) {
-    return <div className="h-screen w-screen bg-app-bg flex items-center justify-center text-gray-500">Checking permissions...</div>;
-  }
+  const verifyKey = async () => {
+    const keyExists = await checkApiKey();
+    setHasKey(keyExists);
+  };
 
-  if (!isApiKeyValid) {
-    return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0B0E14]">
-        <div className="bg-[#151923] p-8 rounded-xl border border-gray-700 max-w-md text-center shadow-2xl animate-in fade-in zoom-in duration-300">
-          <div className="w-16 h-16 bg-app-accent/20 rounded-full flex items-center justify-center mx-auto mb-6">
-            <Key className="text-app-accent" size={32} />
-          </div>
-          <h2 className="text-xl font-bold text-white mb-4">需要连接 API 密钥</h2>
-          <p className="text-gray-400 mb-6 text-sm leading-relaxed">
-            本应用使用 <strong>Gemini 3 Pro</strong> 高级模型进行剧本分析和图像生成。请连接您的 Google Cloud 项目 API 密钥以继续。
-            <br/>
-            <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" rel="noreferrer" className="text-cyan-400 hover:underline text-xs mt-3 inline-block">
-              查看计费和配额说明
-            </a>
-          </p>
-          <button
-            onClick={handleSelectKey}
-            className="bg-app-accent hover:bg-app-accentHover text-white px-8 py-3 rounded-lg font-medium transition-all transform hover:scale-105 shadow-lg shadow-purple-900/30 w-full flex items-center justify-center gap-2"
-          >
-            连接 API 密钥 <ChevronRight size={16} />
-          </button>
-        </div>
-      </div>
+  const handleKeySelected = async () => {
+    await verifyKey();
+    setShowSettings(false);
+  };
+
+  const handleSaveCharacter = (char: Character) => {
+    setSavedCharacters(prev => [...prev, char]);
+  };
+
+  const pushToHistory = useCallback((newStoryState: StoryData, actionType: string) => {
+    setHistory(prev => {
+       const newHistory = prev.slice(0, historyIndex + 1);
+       const entry = { ...newStoryState, lastModified: Date.now(), actionType };
+       return [...newHistory, entry];
+    });
+    setHistoryIndex(prev => prev + 1);
+  }, [historyIndex]);
+
+  const handleUndo = () => {
+    if (historyIndex > 0) {
+       const prevIndex = historyIndex - 1;
+       setHistoryIndex(prevIndex);
+       setStory(history[prevIndex]);
+    }
+  };
+
+  const handleRedo = () => {
+    if (historyIndex < history.length - 1) {
+       const nextIndex = historyIndex + 1;
+       setHistoryIndex(nextIndex);
+       setStory(history[nextIndex]);
+    }
+  };
+
+  const handleJumpToHistory = (index: number) => {
+     setHistoryIndex(index);
+     setStory(history[index]);
+  };
+
+  const generateImagesForScenes = useCallback(async (
+      scenes: Scene[], 
+      characterImages: string[], 
+      style: ArtStyle, 
+      mode: GenerationMode, 
+      ratio: AspectRatio, 
+      seed?: number,
+      worldAnchor?: string,
+      allAnchors?: VisualAnchor[]
+  ) => {
+    
+    const getSceneAnchors = (sceneChars: string[] | undefined) => {
+       if (!sceneChars || !allAnchors) return undefined;
+       return allAnchors.filter(a => sceneChars.includes(a.name));
+    };
+
+    setStory(prev => prev ? {
+        ...prev,
+        scenes: prev.scenes.map(s => scenes.find(target => target.id === s.id) ? { ...s, isLoadingImage: true } : s)
+      } : null
     );
-  }
+
+    const BATCH_SIZE = 2; 
+    
+    for (let i = 0; i < scenes.length; i += BATCH_SIZE) {
+        const batch = scenes.slice(i, i + BATCH_SIZE);
+        
+        await Promise.all(batch.map(async (scene) => {
+            try {
+                const sceneAnchors = getSceneAnchors(scene.characters);
+                
+                const imageUrl = await generateSceneImage(
+                    scene.visual_prompt, 
+                    characterImages, 
+                    style, 
+                    ratio, 
+                    mode, 
+                    worldAnchor, 
+                    sceneAnchors, 
+                    undefined, 
+                    seed
+                );
+
+                setStory(prev => {
+                  if (!prev) return null;
+                  return {
+                    ...prev,
+                    scenes: prev.scenes.map(s => s.id === scene.id ? { ...s, isLoadingImage: false, imageUrl } : s)
+                  };
+                });
+            } catch (error) {
+                console.error(`Failed to generate image for scene ${scene.id}`, error);
+                setStory(prev => prev ? {
+                     ...prev,
+                     scenes: prev.scenes.map(s => s.id === scene.id ? { ...s, isLoadingImage: false } : s)
+                   } : null
+                );
+            }
+        }));
+    }
+  }, []);
+
+  const handleGenerateStoryRequest = async (inputTheme: string, images: string[], style: ArtStyle, mode: GenerationMode, ratio: AspectRatio) => {
+    setIsScriptLoading(true);
+    setIsAnalyzingAnchors(true);
+    setOriginalImages(images);
+    setTheme(inputTheme);
+    setCurrentStyle(style);
+    setCurrentMode(mode);
+    setCurrentRatio(ratio);
+    
+    try {
+      const anchors = await analyzeCharacterVisuals(images, inputTheme);
+      setDetectedAnchors(anchors);
+      setIsAnalyzingAnchors(false);
+      setShowAnchorModal(true);
+    } catch (error) {
+      console.error("Analysis failed", error);
+      setIsAnalyzingAnchors(false);
+      setIsScriptLoading(false);
+      alert("角色分析失败，请重试。");
+    }
+  };
+
+  const handleConfirmAnchors = async (finalAnchors: VisualAnchor[]) => {
+    setShowAnchorModal(false);
+    setDetectedAnchors(finalAnchors);
+    setStory(null);
+    setPlotOptions([]);
+    setHistory([]);
+    setHistoryIndex(-1);
+    setIsScriptLoading(true);
+    setCurrentView('editor'); 
+
+    try {
+      const storyData = await generateStoryScript(theme, originalImages, finalAnchors, currentStyle, currentMode, currentRatio);
+      
+      const storyWithMode: StoryData = { 
+        ...storyData, 
+        mode: currentMode,
+        // SAVE REFERENCE IMAGES FOR PERSISTENCE
+        referenceImages: originalImages
+      };
+      
+      setStory(storyWithMode);
+      pushToHistory(storyWithMode, "故事生成");
+      setIsScriptLoading(false);
+      setCurrentView('editor');
+
+      await generateImagesForScenes(
+         storyData.scenes, 
+         originalImages, 
+         currentStyle, 
+         currentMode, 
+         currentRatio, 
+         storyData.seed,
+         storyData.worldAnchor,
+         finalAnchors
+      );
+
+    } catch (error) {
+      console.error("Error in story flow:", error);
+      alert("生成故事时出错。");
+      setIsScriptLoading(false);
+      setCurrentView('create'); 
+    }
+  };
+
+  const handleRetryImage = async (sceneId: number) => {
+     if (!story || originalImages.length === 0) return;
+     const scene = story.scenes.find(s => s.id === sceneId);
+     if (!scene) return;
+
+     setStory(prev => prev ? {
+        ...prev,
+        scenes: prev.scenes.map(s => s.id === sceneId ? { ...s, isLoadingImage: true, imageUrl: undefined } : s)
+     } : null);
+
+     try {
+        const newSeed = Math.floor(Math.random() * 2147483647);
+        const sceneAnchors = story.visualAnchors?.filter(a => scene.characters?.includes(a.name));
+        
+        const imageUrl = await generateSceneImage(
+            scene.visual_prompt, 
+            originalImages, 
+            currentStyle, 
+            currentRatio, 
+            currentMode, 
+            story.worldAnchor,
+            sceneAnchors,
+            undefined, 
+            newSeed
+        );
+        
+        setStory(prev => prev ? {
+            ...prev,
+            scenes: prev.scenes.map(s => s.id === sceneId ? { ...s, isLoadingImage: false, imageUrl } : s)
+        } : null);
+     } catch (error) {
+        setStory(prev => prev ? {
+            ...prev,
+            scenes: prev.scenes.map(s => s.id === sceneId ? { ...s, isLoadingImage: false } : s)
+        } : null);
+     }
+  };
+
+  const handleModifyImage = async (sceneId: number, feedback: ImageFeedback) => {
+    if (!story || originalImages.length === 0) return;
+    const scene = story.scenes.find(s => s.id === sceneId);
+    if (!scene) return;
+
+    setStory(prev => prev ? {
+       ...prev,
+       scenes: prev.scenes.map(s => s.id === sceneId ? { ...s, isLoadingImage: true } : s) 
+    } : null);
+
+    try {
+       const sceneAnchors = story.visualAnchors?.filter(a => scene.characters?.includes(a.name));
+
+       const imageUrl = await generateSceneImage(
+           scene.visual_prompt, 
+           originalImages, 
+           currentStyle, 
+           currentRatio, 
+           currentMode, 
+           story.worldAnchor,
+           sceneAnchors,
+           feedback, 
+           story.seed
+       );
+
+       setStory(prev => {
+           if (!prev) return null;
+           const newState = {
+               ...prev,
+               scenes: prev.scenes.map(s => s.id === sceneId ? { ...s, isLoadingImage: false, imageUrl } : s)
+           };
+           pushToHistory(newState, `修改场景 ${sceneId + 1}`);
+           return newState;
+       });
+    } catch (error) {
+       console.error("Modification failed", error);
+       setStory(prev => prev ? {
+           ...prev,
+           scenes: prev.scenes.map(s => s.id === sceneId ? { ...s, isLoadingImage: false } : s)
+       } : null);
+       alert("修改图片失败，请重试。");
+    }
+  };
+
+  const handleUpdateScene = async (sceneId: number, narrative: string, visualPrompt: string, shouldRegenerate: boolean) => {
+    if (!story) return;
+    
+    const newState = {
+      ...story,
+      scenes: story.scenes.map(s => s.id === sceneId ? { ...s, narrative, visual_prompt: visualPrompt } : s)
+    };
+    
+    setStory(newState);
+    if (!shouldRegenerate) {
+       pushToHistory(newState, `更新场景 ${sceneId + 1} 文本`);
+    }
+
+    if (shouldRegenerate && originalImages.length > 0) {
+      setStory(prev => prev ? {
+        ...prev,
+        scenes: prev.scenes.map(s => s.id === sceneId ? { ...s, isLoadingImage: true } : s)
+      } : null);
+
+      try {
+        const scene = story.scenes.find(s => s.id === sceneId);
+        const sceneAnchors = story.visualAnchors?.filter(a => scene?.characters?.includes(a.name));
+
+        const imageUrl = await generateSceneImage(
+            visualPrompt, 
+            originalImages, 
+            currentStyle, 
+            currentRatio, 
+            currentMode, 
+            story.worldAnchor,
+            sceneAnchors,
+            undefined, 
+            story.seed
+        );
+        
+        setStory(prev => {
+            if (!prev) return null;
+            const updatedState = {
+                ...prev,
+                scenes: prev.scenes.map(s => s.id === sceneId ? { ...s, isLoadingImage: false, imageUrl } : s)
+            };
+            pushToHistory(updatedState, `重绘场景 ${sceneId + 1}`);
+            return updatedState;
+        });
+      } catch (error) {
+         setStory(prev => prev ? {
+            ...prev,
+            scenes: prev.scenes.map(s => s.id === sceneId ? { ...s, isLoadingImage: false } : s)
+        } : null);
+      }
+    }
+  };
+
+  const handleUpdateTags = (sceneId: number, tags: string[]) => {
+    if (!story) return;
+    const newState = {
+      ...story,
+      scenes: story.scenes.map(s => s.id === sceneId ? { ...s, tags } : s)
+    };
+    setStory(newState);
+  };
+
+  const handleUpdateCharacters = (sceneId: number, chars: string[]) => {
+    if (!story) return;
+    setStory(prev => prev ? {
+      ...prev,
+      scenes: prev.scenes.map(s => s.id === sceneId ? { ...s, characters: chars } : s)
+    } : null);
+  };
+
+  const handleGetOptions = async () => {
+    if (!story) return;
+    setIsLoadingOptions(true);
+    try {
+      const options = await generatePlotOptions(story.scenes, theme);
+      setPlotOptions(options);
+    } catch (error) {
+      console.error("Failed to get options", error);
+      alert("无法生成剧情选项，请重试。");
+    } finally {
+      setIsLoadingOptions(false);
+    }
+  };
+
+  const handleExtendStory = async (option: string) => {
+    if (!story || originalImages.length === 0) return;
+    setIsExtendingStory(true);
+    setPlotOptions([]);
+
+    try {
+      const lastId = story.scenes.length > 0 ? Math.max(...story.scenes.map(s => s.id)) + 1 : 0;
+      const newScenes = await extendStoryScript(theme, originalImages, story.scenes, option, lastId, currentStyle, currentMode, currentRatio, story.visualAnchors);
+      
+      setStory(prev => {
+          if (!prev) return null;
+          const extendedState = {
+             ...prev,
+             scenes: [...prev.scenes, ...newScenes]
+          };
+          pushToHistory(extendedState, "续写故事");
+          return extendedState;
+      });
+
+      setIsExtendingStory(false);
+      await generateImagesForScenes(
+         newScenes, 
+         originalImages, 
+         currentStyle, 
+         currentMode, 
+         currentRatio, 
+         story.seed,
+         story.worldAnchor,
+         story.visualAnchors
+      );
+
+    } catch (error) {
+      console.error("Failed to extend story", error);
+      setIsExtendingStory(false);
+      alert("续写故事失败。");
+    }
+  };
+
+  const handleOptimizeStory = async () => {
+    if (!story) return;
+    setIsOptimizingStory(true);
+    try {
+      const optimizedScenes = await optimizeFullStory(story, theme, currentStyle);
+      const newState = {
+        ...story,
+        scenes: optimizedScenes
+      };
+      setStory(newState);
+      pushToHistory(newState, "优化全篇脚本");
+    } catch (error) {
+      console.error("Failed to optimize story", error);
+      alert("优化脚本失败，请重试。");
+    } finally {
+      setIsOptimizingStory(false);
+    }
+  };
+
+  const handleGenerateAudio = async (sceneId: number, text: string) => {
+    if (!story) return;
+    setStory(prev => prev ? {
+      ...prev,
+      scenes: prev.scenes.map(s => s.id === sceneId ? { ...s, isLoadingAudio: true } : s)
+    } : null);
+
+    try {
+      const audioUrl = await generateSpeech(text);
+      setStory(prev => prev ? {
+        ...prev,
+        scenes: prev.scenes.map(s => s.id === sceneId ? { ...s, isLoadingAudio: false, audioUrl } : s)
+      } : null);
+    } catch (error) {
+      console.error("Failed to generate audio", error);
+      alert("生成语音失败。");
+      setStory(prev => prev ? {
+        ...prev,
+        scenes: prev.scenes.map(s => s.id === sceneId ? { ...s, isLoadingAudio: false } : s)
+      } : null);
+    }
+  };
+
+  const handleGenerateVideo = async (sceneId: number) => {
+    if (!story) return;
+    const scene = story.scenes.find(s => s.id === sceneId);
+    if (!scene || !scene.imageUrl) return;
+
+    setStory(prev => prev ? {
+      ...prev,
+      scenes: prev.scenes.map(s => s.id === sceneId ? { ...s, isLoadingVideo: true } : s)
+    } : null);
+
+    try {
+      const { url, cost } = await generateSceneVideo(scene.imageUrl, scene.visual_prompt);
+      setStory(prev => prev ? {
+        ...prev,
+        scenes: prev.scenes.map(s => s.id === sceneId ? { 
+          ...s, 
+          isLoadingVideo: false, 
+          videoUrl: url,
+          videoCost: cost 
+        } : s)
+      } : null);
+    } catch (error) {
+      console.error("Failed to generate video", error);
+      alert("生成视频失败 (Veo)。请重试。");
+      setStory(prev => prev ? {
+        ...prev,
+        scenes: prev.scenes.map(s => s.id === sceneId ? { ...s, isLoadingVideo: false } : s)
+      } : null);
+    }
+  };
+
+  const handlePolishText = async (text: string, type: 'narrative' | 'visual'): Promise<string> => {
+    try {
+      return await polishText(text, type);
+    } catch (error) {
+      return text;
+    }
+  };
+
+  const handleExport = (selectedSceneIds: number[], config: ExportConfig) => {
+    if (!story) return;
+    const scenesToExport = story.scenes.filter(s => selectedSceneIds.includes(s.id));
+    exportScenes(scenesToExport, config, story.title, story.mode);
+  };
 
   return (
-    <Router>
-      <Routes>
-        <Route path="/" element={<Layout />}>
-          <Route index element={<Navigate to="/script" replace />} />
-          <Route path="script" element={<ScriptEditor />} />
-          <Route path="characters" element={<CharacterLibrary />} />
-          <Route path="storyboard" element={<StoryboardView />} />
-          <Route path="timeline" element={<TimelineView />} />
-          <Route path="assets" element={<div className="flex-1 flex items-center justify-center text-gray-500">素材库开发中...</div>} />
-          <Route path="subscription" element={<div className="flex-1 flex items-center justify-center text-gray-500">订阅服务开发中...</div>} />
-        </Route>
-      </Routes>
-    </Router>
+    <div className="flex h-screen bg-[#0f111a] text-white font-sans overflow-hidden selection:bg-indigo-500/30">
+      {(!hasKey || showSettings) && (
+        <ApiKeySelector 
+          onKeySelected={handleKeySelected} 
+          onClose={hasKey ? () => setShowSettings(false) : undefined}
+        />
+      )}
+
+      {showAnchorModal && (
+        <AnchorReviewModal 
+          anchors={detectedAnchors}
+          referenceImages={originalImages}
+          onConfirm={handleConfirmAnchors}
+          onCancel={() => { setShowAnchorModal(false); setIsScriptLoading(false); }}
+        />
+      )}
+
+      {/* LEFT SIDEBAR */}
+      <Sidebar 
+        currentView={currentView} 
+        onChangeView={setCurrentView} 
+        hasActiveStory={!!story}
+        onOpenSettings={() => setShowSettings(true)}
+      />
+
+      {/* MAIN CONTENT AREA */}
+      <main className="flex-1 overflow-y-auto relative custom-scrollbar bg-[#0f111a]">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-900/10 via-slate-950/40 to-slate-950 pointer-events-none"></div>
+        <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-10 pointer-events-none mix-blend-overlay"></div>
+
+        <div className="min-h-full relative z-10">
+          
+          {/* VIEW: CREATE PROJECT */}
+          {currentView === 'create' && (
+            <StoryForm 
+              onSubmit={handleGenerateStoryRequest} 
+              isGenerating={isScriptLoading || isAnalyzingAnchors} 
+              savedCharacters={savedCharacters}
+              onSaveCharacter={handleSaveCharacter}
+            />
+          )}
+
+          {/* VIEW: CHARACTER LIBRARY */}
+          {currentView === 'characters' && (
+             <CharacterLibrary 
+                characters={savedCharacters} 
+                onSaveCharacter={handleSaveCharacter} 
+             />
+          )}
+
+          {/* VIEW: EDITOR / STORYBOARD */}
+          {currentView === 'editor' && (
+            <>
+              {isScriptLoading ? (
+                <div className="h-full flex flex-col items-center justify-center text-slate-400">
+                   <div className="relative mb-6">
+                      <div className="absolute inset-0 bg-indigo-500/20 rounded-full blur-xl animate-pulse"></div>
+                      <Loader2 className="w-12 h-12 text-indigo-400 animate-spin relative z-10" />
+                   </div>
+                   <h3 className="text-xl font-bold text-white mb-2">正在构建故事世界...</h3>
+                   <p className="text-sm max-w-md text-center opacity-70">Gemini 3 Pro 正在编写剧本并绘制首批分镜。</p>
+                </div>
+              ) : story ? (
+                <div className="p-8 md:p-12">
+                  <Storyboard 
+                    story={story} 
+                    characterImages={originalImages}
+                    onRetryImage={handleRetryImage}
+                    onModifyImage={handleModifyImage}
+                    onUpdateScene={handleUpdateScene}
+                    onUpdateTags={handleUpdateTags}
+                    onUpdateCharacters={handleUpdateCharacters}
+                    onRequestOptions={handleGetOptions}
+                    onSelectOption={handleExtendStory}
+                    onGenerateAudio={handleGenerateAudio}
+                    onGenerateVideo={handleGenerateVideo}
+                    onPolishText={handlePolishText}
+                    onExport={handleExport}
+                    onOptimizeStory={handleOptimizeStory}
+                    plotOptions={plotOptions}
+                    isLoadingOptions={isLoadingOptions}
+                    isExtendingStory={isExtendingStory}
+                    isOptimizingStory={isOptimizingStory}
+                    canUndo={historyIndex > 0}
+                    canRedo={historyIndex < history.length - 1}
+                    onUndo={handleUndo}
+                    onRedo={handleRedo}
+                    historyList={history}
+                    currentHistoryIndex={historyIndex}
+                    onJumpToHistory={handleJumpToHistory}
+                  />
+                </div>
+              ) : (
+                <div className="h-full flex flex-col items-center justify-center p-8 text-center text-slate-500">
+                    <div className="relative mb-6 inline-block">
+                        <div className="absolute inset-0 bg-indigo-500/10 blur-xl rounded-full"></div>
+                        <Layout className="w-16 h-16 text-slate-700 relative z-10" />
+                    </div>
+                    <h3 className="text-xl font-bold text-white mb-2">暂无活跃项目</h3>
+                    <p className="mb-6 opacity-60">请前往创作中心生成新故事</p>
+                    <button onClick={() => setCurrentView('create')} className="px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl shadow-lg transition-all flex items-center gap-2 mx-auto">
+                        <Sparkles className="w-4 h-4" /> 去创作
+                    </button>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </main>
+    </div>
   );
-}
+};
+
+export default App;
