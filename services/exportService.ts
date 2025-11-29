@@ -72,6 +72,98 @@ const textToImage = (text: string, widthMm: number, isTitle: boolean = false): {
 };
 
 /**
+ * Helper to wrap text for Canvas
+ */
+const wrapCanvasText = (ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] => {
+  const words = text.split('');
+  const lines: string[] = [];
+  let currentLine = words[0] || '';
+
+  for (let i = 1; i < words.length; i++) {
+      const word = words[i];
+      const width = ctx.measureText(currentLine + word).width;
+      if (width < maxWidth) {
+          currentLine += word;
+      } else {
+          lines.push(currentLine);
+          currentLine = word;
+      }
+  }
+  lines.push(currentLine);
+  return lines;
+};
+
+/**
+ * Draws a comic speech bubble on the canvas
+ */
+const drawSpeechBubble = (
+  ctx: CanvasRenderingContext2D, 
+  text: string, 
+  panelX: number, 
+  panelY: number, 
+  panelW: number,
+  panelH: number
+) => {
+  const fontSize = 28; // Large readable font
+  ctx.font = `bold ${fontSize}px "Microsoft YaHei", sans-serif`;
+  
+  const bubblePadding = 20;
+  const maxBubbleWidth = panelW * 0.85; // Bubble takes up mostly full width
+  const lines = wrapCanvasText(ctx, text, maxBubbleWidth - (bubblePadding * 2));
+  
+  const bubbleHeight = (lines.length * (fontSize * 1.4)) + (bubblePadding * 2);
+  const bubbleWidth = lines.reduce((max, line) => Math.max(max, ctx.measureText(line).width), 0) + (bubblePadding * 2);
+  
+  // Position: Top Left with some margin
+  const bubbleX = panelX + 30;
+  const bubbleY = panelY + 30;
+  
+  // Draw Bubble Shape (Rounded Rect)
+  const r = 15; // radius
+  ctx.beginPath();
+  ctx.moveTo(bubbleX + r, bubbleY);
+  ctx.lineTo(bubbleX + bubbleWidth - r, bubbleY);
+  ctx.quadraticCurveTo(bubbleX + bubbleWidth, bubbleY, bubbleX + bubbleWidth, bubbleY + r);
+  ctx.lineTo(bubbleX + bubbleWidth, bubbleY + bubbleHeight - r);
+  ctx.quadraticCurveTo(bubbleX + bubbleWidth, bubbleY + bubbleHeight, bubbleX + bubbleWidth - r, bubbleY + bubbleHeight);
+  // Tail start
+  ctx.lineTo(bubbleX + 40, bubbleY + bubbleHeight); 
+  ctx.lineTo(bubbleX + 20, bubbleY + bubbleHeight + 15); // Tail tip
+  ctx.lineTo(bubbleX + 30, bubbleY + bubbleHeight); // Tail end
+  // Continue rect
+  ctx.lineTo(bubbleX + r, bubbleY + bubbleHeight);
+  ctx.quadraticCurveTo(bubbleX, bubbleY + bubbleHeight, bubbleX, bubbleY + bubbleHeight - r);
+  ctx.lineTo(bubbleX, bubbleY + r);
+  ctx.quadraticCurveTo(bubbleX, bubbleY, bubbleX + r, bubbleY);
+  ctx.closePath();
+  
+  // Shadow
+  ctx.fillStyle = 'rgba(0,0,0,0.3)';
+  ctx.save();
+  ctx.translate(4, 4);
+  ctx.fill();
+  ctx.restore();
+
+  // Fill White
+  ctx.fillStyle = '#ffffff';
+  ctx.fill();
+  
+  // Stroke Black
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = '#000000';
+  ctx.stroke();
+
+  // Text
+  ctx.fillStyle = '#000000';
+  ctx.textBaseline = 'top';
+  ctx.textAlign = 'left';
+  
+  lines.forEach((line, i) => {
+    ctx.fillText(line, bubbleX + bubblePadding, bubbleY + bubblePadding + (i * fontSize * 1.4));
+  });
+};
+
+/**
  * Draws the image onto a canvas and overlays text based on the mode.
  * Returns the base64 string of the composited image.
  */
@@ -93,40 +185,8 @@ const compositeImageWithText = async (base64: string, text: string, mode: Genera
       // Text Overlay Logic
       if (text) {
         if (mode === 'comic') {
-           // Comic Mode: Clean caption bar at the bottom
-           const barHeight = Math.max(60, canvas.height * 0.15);
-           const y = canvas.height - barHeight;
-           
-           // Draw White Bar
-           ctx.fillStyle = '#ffffff';
-           ctx.fillRect(0, y, canvas.width, barHeight);
-           
-           // Draw Top Border for Bar
-           ctx.strokeStyle = '#000000';
-           ctx.lineWidth = 4;
-           ctx.beginPath();
-           ctx.moveTo(0, y);
-           ctx.lineTo(canvas.width, y);
-           ctx.stroke();
-
-           // Draw Text
-           const fontSize = Math.floor(barHeight * 0.4);
-           ctx.font = `bold ${fontSize}px "Microsoft YaHei", sans-serif`;
-           ctx.fillStyle = '#000000';
-           ctx.textAlign = 'center';
-           ctx.textBaseline = 'middle';
-           
-           // Fit text
-           const maxWidth = canvas.width * 0.9;
-           // Simple truncation if too long for now, or resize font
-           let displayText = text;
-           if (ctx.measureText(displayText).width > maxWidth) {
-              const approxChars = Math.floor(displayText.length * (maxWidth / ctx.measureText(displayText).width));
-              displayText = displayText.substring(0, approxChars - 2) + "...";
-           }
-           
-           ctx.fillText(displayText, canvas.width / 2, y + barHeight / 2);
-
+           // Draw Comic Bubble inside the image
+           drawSpeechBubble(ctx, text, 0, 0, canvas.width, canvas.height);
         } else {
            // Storyboard Mode: Cinematic Subtitles
            const gradientHeight = canvas.height * 0.25;
@@ -150,21 +210,7 @@ const compositeImageWithText = async (base64: string, text: string, mode: Genera
            ctx.shadowOffsetY = 2;
 
            const maxTextWidth = canvas.width * 0.8;
-           const words = text.split('');
-           let lines: string[] = [];
-           let currentLine = words[0] || '';
-           
-           for (let i = 1; i < words.length; i++) {
-             const word = words[i];
-             const width = ctx.measureText(currentLine + word).width;
-             if (width < maxTextWidth) {
-               currentLine += word;
-             } else {
-               lines.push(currentLine);
-               currentLine = word;
-             }
-           }
-           lines.push(currentLine);
+           const lines = wrapCanvasText(ctx, text, maxTextWidth);
 
            const lineHeight = fontSize * 1.4;
            const bottomPadding = canvas.height * 0.05;
@@ -182,7 +228,7 @@ const compositeImageWithText = async (base64: string, text: string, mode: Genera
 };
 
 /**
- * Generates a Comic Page Grid (Stitched Image)
+ * Generates a Comic Page Grid (Stitched Image) matching the UI 2-column layout
  */
 const generateComicSheet = async (scenes: Scene[], title: string, hasBurntText: boolean): Promise<Blob> => {
   const loadedImages = await Promise.all(scenes.map(s => new Promise<{img: HTMLImageElement, scene: Scene}>((resolve) => {
@@ -195,81 +241,43 @@ const generateComicSheet = async (scenes: Scene[], title: string, hasBurntText: 
 
   if (loadedImages.length === 0) return new Blob();
 
-  const CANVAS_WIDTH = 2480; // A4 Width @ 300dpi is approx 2480px
-  const MARGIN = 120;
-  const GUTTER_X = 80;
-  const GUTTER_Y = 100;
-  const COLS = 2; // Classic Comic Layout
-  const PANEL_WIDTH = (CANVAS_WIDTH - (MARGIN * 2) - (GUTTER_X * (COLS - 1))) / COLS;
+  // Configuration for A4-ish high res output
+  const CANVAS_WIDTH = 2480; 
+  const MARGIN_X = 120;
+  const MARGIN_Y = 120;
+  const HEADER_HEIGHT = 400; // Title area height
+  const PAGE_GAP = 100; // Gap between "pages"
+  const GAP = 40; // Gap between panels
+  const COLS = 2;
+  const PANEL_WIDTH = (CANVAS_WIDTH - (MARGIN_X * 2) - (GAP * (COLS - 1))) / COLS;
+  
+  // Calculate Standard Row Height (e.g. 3:4 aspect or 1:1)
+  // To keep it clean like the UI grid, let's assume a slightly tall rect or square.
+  // 16:9 images in a 2-col grid usually look best with their native ratio, 
+  // but to align rows, we should check max height.
+  // Let's use a fixed standard height for uniformity to match the "Grid" look.
+  const STANDARD_PANEL_HEIGHT = PANEL_WIDTH * 0.75; // 4:3 aspect ratio roughly
 
-  // Temporary canvas for text measurement
-  const tempCanvas = document.createElement('canvas');
-  const tempCtx = tempCanvas.getContext('2d');
+  const SCENES_PER_PAGE = 6;
+  const totalPages = Math.ceil(loadedImages.length / SCENES_PER_PAGE);
+
+  // Calculate Total Canvas Height
+  let totalHeight = 0;
   
-  // Calculate Layout Positions
-  let currentX = MARGIN;
-  let currentY = 320; // Start after Header
-  let maxHeightInRow = 0;
-  
-  const renderItems: any[] = [];
-  
-  loadedImages.forEach((item, index) => {
-      const { img, scene } = item;
-      const aspectRatio = img.width > 0 ? img.width / img.height : 1.33;
-      const renderHeight = PANEL_WIDTH / aspectRatio;
+  for (let p = 0; p < totalPages; p++) {
+      // Per Page Height calculation
+      let pageHeight = (p === 0 ? HEADER_HEIGHT : MARGIN_Y); // First page has header
       
-      let textHeight = 0;
-      let lines: string[] = [];
+      const rowsInPage = Math.ceil(Math.min(SCENES_PER_PAGE, loadedImages.length - (p * SCENES_PER_PAGE)) / COLS);
+      
+      pageHeight += rowsInPage * STANDARD_PANEL_HEIGHT;
+      pageHeight += (rowsInPage - 1) * GAP;
+      pageHeight += MARGIN_Y * 2; // Bottom margin + padding
+      
+      totalHeight += pageHeight;
+      if (p < totalPages - 1) totalHeight += PAGE_GAP;
+  }
 
-      // Calculate separate text height if text is NOT burnt into the image
-      if (!hasBurntText && tempCtx) {
-           tempCtx.font = '32px "Microsoft YaHei", sans-serif';
-           const maxWidth = PANEL_WIDTH;
-           const words = scene.narrative.split('');
-           let currentLine = words[0] || '';
-           for (let i = 1; i < words.length; i++) {
-               const width = tempCtx.measureText(currentLine + words[i]).width;
-               if (width < maxWidth) {
-                   currentLine += words[i];
-               } else {
-                   lines.push(currentLine);
-                   currentLine = words[i];
-               }
-           }
-           lines.push(currentLine);
-           textHeight = (lines.length * 48) + 30; // Line height + padding
-      }
-
-      // Grid Logic
-      const colIndex = index % COLS;
-      if (colIndex === 0 && index !== 0) {
-          // New Row: Advance Y by previous row's max height + gutter
-          currentY += maxHeightInRow + GUTTER_Y;
-          currentX = MARGIN;
-          maxHeightInRow = 0;
-      }
-
-      const totalItemHeight = renderHeight + textHeight;
-      if (totalItemHeight > maxHeightInRow) maxHeightInRow = totalItemHeight;
-
-      renderItems.push({
-          img,
-          x: currentX,
-          y: currentY,
-          w: PANEL_WIDTH,
-          h: renderHeight,
-          textLines: lines,
-          textHeight,
-          sceneId: scene.id + 1
-      });
-
-      // Advance X
-      currentX += PANEL_WIDTH + GUTTER_X;
-  });
-
-  // Calculate Final Height
-  const totalHeight = currentY + maxHeightInRow + MARGIN;
-  
   const canvas = document.createElement('canvas');
   canvas.width = CANVAS_WIDTH;
   canvas.height = totalHeight;
@@ -277,86 +285,134 @@ const generateComicSheet = async (scenes: Scene[], title: string, hasBurntText: 
   
   if (!ctx) return new Blob();
 
-  // 1. Draw Background
+  // 1. Draw White Background
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
-  
-  // 2. Draw Header
-  ctx.fillStyle = '#000000';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  
-  // Title
-  ctx.font = 'bold 80px "Microsoft YaHei", sans-serif';
-  ctx.fillText(title, CANVAS_WIDTH / 2, 120);
-  
-  // Metadata
-  ctx.font = 'bold 30px "Microsoft YaHei", monospace';
-  ctx.fillStyle = '#555555';
-  const dateStr = new Date().toLocaleDateString();
-  ctx.fillText(`ISSUE #01  •  ${dateStr}  •  GEMINI AI COMICS`, CANVAS_WIDTH / 2, 220);
 
-  // Separator Line
-  ctx.beginPath();
-  ctx.moveTo(MARGIN, 260);
-  ctx.lineTo(CANVAS_WIDTH - MARGIN, 260);
-  ctx.strokeStyle = '#000000';
-  ctx.lineWidth = 4;
-  ctx.stroke();
+  // Helper for drawing pages
+  let currentY = 0;
 
-  // 3. Draw Panels
-  renderItems.forEach((item: any) => {
-      // Draw Shadow (Hard Edge Comic Style)
-      const shadowOffset = 15;
-      ctx.fillStyle = '#000000';
-      ctx.fillRect(item.x + shadowOffset, item.y + shadowOffset, item.w, item.h);
+  for (let p = 0; p < totalPages; p++) {
+      const pageStartY = currentY;
+      
+      // Page Background (Optional visual separation, or just contiguous white)
+      // If we want it to look like stacked sheets, we can draw a slight shadow/border per page.
+      // For now, clean contiguous sheet.
 
-      // Draw Image
-      if (item.img.width > 0) {
-        ctx.drawImage(item.img, item.x, item.y, item.w, item.h);
+      // Draw Header on First Page
+      if (p === 0) {
+          ctx.fillStyle = '#000000';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          
+          // Title
+          ctx.font = 'bold 80px "Microsoft YaHei", sans-serif';
+          ctx.fillText(title, CANVAS_WIDTH / 2, pageStartY + 150);
+          
+          // Metadata
+          ctx.font = 'bold 30px "Microsoft YaHei", monospace';
+          ctx.fillStyle = '#555555';
+          const dateStr = new Date().toLocaleDateString();
+          ctx.fillText(`ISSUE #01  •  ${dateStr}  •  GEMINI AI COMICS`, CANVAS_WIDTH / 2, pageStartY + 250);
+
+          // Divider
+          ctx.beginPath();
+          ctx.moveTo(MARGIN_X, pageStartY + 300);
+          ctx.lineTo(CANVAS_WIDTH - MARGIN_X, pageStartY + 300);
+          ctx.strokeStyle = '#000000';
+          ctx.lineWidth = 4;
+          ctx.stroke();
+
+          currentY += HEADER_HEIGHT;
       } else {
-        // Fallback for empty image
-        ctx.fillStyle = '#eeeeee';
-        ctx.fillRect(item.x, item.y, item.w, item.h);
+          currentY += MARGIN_Y; // Top margin for subsequent pages
       }
-      
-      // Draw Border
-      ctx.strokeStyle = '#000000';
-      ctx.lineWidth = 6;
-      ctx.strokeRect(item.x, item.y, item.w, item.h);
 
-      // Draw Panel Number Badge (Top Left Corner overlap)
-      const badgeSize = 50;
-      ctx.fillStyle = '#000000';
-      ctx.beginPath();
-      ctx.arc(item.x, item.y, badgeSize/2, 0, Math.PI*2);
-      ctx.fill();
+      // Draw Grid for this Page
+      const pageScenes = loadedImages.slice(p * SCENES_PER_PAGE, (p + 1) * SCENES_PER_PAGE);
       
-      ctx.fillStyle = '#ffffff';
+      pageScenes.forEach((item, idx) => {
+          const col = idx % COLS;
+          const row = Math.floor(idx / COLS);
+          
+          const x = MARGIN_X + (col * (PANEL_WIDTH + GAP));
+          const y = currentY + (row * (STANDARD_PANEL_HEIGHT + GAP));
+          
+          const { img, scene } = item;
+
+          // 1. Draw Shadow
+          const shadowOff = 15;
+          ctx.fillStyle = '#000000';
+          ctx.fillRect(x + shadowOff, y + shadowOff, PANEL_WIDTH, STANDARD_PANEL_HEIGHT);
+
+          // 2. Draw Image (Object Cover)
+          ctx.save();
+          ctx.beginPath();
+          ctx.rect(x, y, PANEL_WIDTH, STANDARD_PANEL_HEIGHT);
+          ctx.clip();
+          
+          if (img.width > 0) {
+              // Calculate aspect ratio to fit "cover"
+              const imgRatio = img.width / img.height;
+              const panelRatio = PANEL_WIDTH / STANDARD_PANEL_HEIGHT;
+              let renderW, renderH, offX, offY;
+
+              if (imgRatio > panelRatio) {
+                  renderH = STANDARD_PANEL_HEIGHT;
+                  renderW = renderH * imgRatio;
+                  offY = 0;
+                  offX = (PANEL_WIDTH - renderW) / 2;
+              } else {
+                  renderW = PANEL_WIDTH;
+                  renderH = renderW / imgRatio;
+                  offX = 0;
+                  offY = (STANDARD_PANEL_HEIGHT - renderH) / 2;
+              }
+              ctx.drawImage(img, x + offX, y + offY, renderW, renderH);
+          } else {
+              ctx.fillStyle = '#eeeeee';
+              ctx.fillRect(x, y, PANEL_WIDTH, STANDARD_PANEL_HEIGHT);
+          }
+          ctx.restore();
+
+          // 3. Draw Border
+          ctx.strokeStyle = '#000000';
+          ctx.lineWidth = 6;
+          ctx.strokeRect(x, y, PANEL_WIDTH, STANDARD_PANEL_HEIGHT);
+
+          // 4. Draw Number Badge
+          const badgeSize = 50;
+          ctx.fillStyle = '#000000';
+          ctx.beginPath();
+          ctx.arc(x, y, badgeSize/2, 0, Math.PI*2);
+          ctx.fill();
+          
+          ctx.fillStyle = '#ffffff';
+          ctx.font = 'bold 24px Arial';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(String(scene.id + 1), x, y);
+
+          // 5. Draw Speech Bubble
+          if (hasBurntText) {
+             drawSpeechBubble(ctx, scene.narrative, x, y, PANEL_WIDTH, STANDARD_PANEL_HEIGHT);
+          }
+      });
+
+      // Advance Y for next page
+      const rowsInThisPage = Math.ceil(pageScenes.length / COLS);
+      currentY += (rowsInThisPage * STANDARD_PANEL_HEIGHT) + ((rowsInThisPage - 1) * GAP) + MARGIN_Y;
+
+      // Draw Page Footer
+      ctx.fillStyle = '#000000';
       ctx.font = 'bold 24px Arial';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(String(item.sceneId), item.x, item.y);
+      ctx.fillText(`PAGE ${p + 1}`, CANVAS_WIDTH / 2, currentY - 40);
 
-      // Draw Separated Text if needed (Below panel)
-      if (!hasBurntText && item.textLines.length > 0) {
-          ctx.fillStyle = '#000000';
-          ctx.font = '32px "Microsoft YaHei", sans-serif';
-          ctx.textAlign = 'left';
-          ctx.textBaseline = 'top';
-          
-          const textStartY = item.y + item.h + 25;
-          item.textLines.forEach((line: string, i: number) => {
-              ctx.fillText(line, item.x, textStartY + (i * 48));
-          });
-      }
-  });
-
-  // Footer / Page Number
-  ctx.fillStyle = '#000000';
-  ctx.font = 'bold 24px Arial';
-  ctx.textAlign = 'center';
-  ctx.fillText("PAGE 1", CANVAS_WIDTH / 2, totalHeight - 40);
+      // Add Gap for next page
+      currentY += PAGE_GAP;
+  }
 
   return new Promise(resolve => canvas.toBlob(blob => resolve(blob!), 'image/png'));
 };
@@ -392,6 +448,10 @@ const generateLongImage = async (scenes: Scene[], title: string, hasBurntText: b
     
     let textHeight = 0;
     let lines: string[] = [];
+    
+    // In Storyboard mode, text is burnt into image usually by compositeImageWithText if selected.
+    // However, if hasBurntText is FALSE, we render text below.
+    // If hasBurntText is TRUE, compositeImageWithText handled the subtitle overlay already, so we just draw the image.
     
     if (!hasBurntText && tempCtx) {
        tempCtx.font = '24px "Microsoft YaHei", sans-serif';
@@ -474,8 +534,10 @@ export const exportScenes = async (
   const validScenes = scenes.filter(s => s.imageUrl);
   if (validScenes.length === 0) return;
 
+  // Process images for PDF or Zip (Individual files)
   const processedScenes = await Promise.all(validScenes.map(async (scene) => {
      if (config.withText && scene.imageUrl) {
+        // This burns text into the image itself
         const newUrl = await compositeImageWithText(scene.imageUrl, scene.narrative, mode);
         return { ...scene, imageUrl: newUrl };
      }
@@ -564,7 +626,7 @@ export const exportScenes = async (
   }
   else if (config.format === 'long-image') {
     if (mode === 'comic') {
-       // Switch to Comic Grid Layout
+       // Switch to Comic Grid Layout (Paginated 2-col)
        const blob = await generateComicSheet(processedScenes, storyTitle, config.withText);
        saveAs(blob, `${storyTitle.replace(/\s+/g, '_')}_ComicPage.png`);
     } else {

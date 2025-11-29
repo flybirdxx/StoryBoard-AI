@@ -12,19 +12,45 @@ const getAIClient = () => {
   return new GoogleGenAI({ apiKey });
 };
 
-// Helper to retry API calls with exponential backoff
-async function callWithRetry<T>(fn: () => Promise<T>, retries = 3, delayMs = 1000): Promise<T> {
+// Helper to retry API calls with exponential backoff and AbortSignal support
+async function callWithRetry<T>(
+  fn: () => Promise<T>, 
+  retries = 3, 
+  delayMs = 1000,
+  signal?: AbortSignal
+): Promise<T> {
   let lastError;
   for (let i = 0; i < retries; i++) {
+    // Check abort signal before attempt
+    if (signal?.aborted) {
+      throw new DOMException('Aborted', 'AbortError');
+    }
+
     try {
       return await fn();
     } catch (error: any) {
+      // If it's an abort error from the inner function, throw immediately
+      if (error.name === 'AbortError') throw error;
+      
       console.warn(`Gemini API Attempt ${i + 1} failed:`, error);
       lastError = error;
+      
       if (error.toString().includes("Safety") || error.toString().includes("Blocked")) {
         throw error;
       }
-      await new Promise(resolve => setTimeout(resolve, delayMs * Math.pow(2, i)));
+      
+      // Wait before retry, listening for abort
+      if (i < retries - 1) {
+        await new Promise((resolve, reject) => {
+           const timeoutId = setTimeout(resolve, delayMs * Math.pow(2, i));
+           if (signal) {
+             signal.addEventListener('abort', () => {
+               clearTimeout(timeoutId);
+               reject(new DOMException('Aborted', 'AbortError'));
+             }, { once: true });
+           }
+        });
+      }
     }
   }
   throw lastError;
@@ -59,7 +85,8 @@ interface AnalyzedCharacter {
  */
 export const analyzeCharacterVisuals = async (
   images: string[],
-  theme: string
+  theme: string,
+  signal?: AbortSignal
 ): Promise<VisualAnchor[]> => {
   const ai = getAIClient();
   const prompt = Prompts.buildAnalyzeCharactersPrompt(theme);
@@ -75,7 +102,7 @@ export const analyzeCharacterVisuals = async (
         responseSchema: Prompts.ANALYZE_CHARACTERS_SCHEMA,
         safetySettings: Prompts.SAFETY_SETTINGS,
       },
-    }));
+    }), 3, 1000, signal);
 
     const text = response.text;
     if (!text) return [];
@@ -102,7 +129,8 @@ export const generateStoryScript = async (
   anchors: VisualAnchor[],
   artStyle: ArtStyle,
   mode: GenerationMode,
-  aspectRatio: AspectRatio
+  aspectRatio: AspectRatio,
+  signal?: AbortSignal
 ): Promise<StoryData> => {
   const ai = getAIClient();
   const seed = Math.floor(Math.random() * 2147483647);
@@ -127,7 +155,7 @@ export const generateStoryScript = async (
         responseSchema: schema,
         safetySettings: Prompts.SAFETY_SETTINGS,
       },
-    }));
+    }), 3, 1000, signal);
 
     const text = response.text;
     if (!text) throw new Error("No response from Gemini.");
@@ -402,7 +430,13 @@ export const generateStylePreview = async (styleLabel: string, styleDesc: string
   }
 };
 
-export const generateCharacterDesign = async (desc: string, sketch: string | null, style: ArtStyle, ratio: AspectRatio): Promise<string> => {
+export const generateCharacterDesign = async (
+    desc: string, 
+    sketch: string | null, 
+    style: ArtStyle, 
+    ratio: AspectRatio,
+    signal?: AbortSignal
+): Promise<string> => {
     const ai = getAIClient();
     const prompt = Prompts.buildCharacterDesignPrompt(style, desc);
     try {
@@ -417,7 +451,8 @@ export const generateCharacterDesign = async (desc: string, sketch: string | nul
               imageConfig: { aspectRatio: ratio, imageSize: "2K" },
               safetySettings: Prompts.SAFETY_SETTINGS
             },
-        }));
+        }), 3, 1000, signal);
+
         for (const part of response.candidates?.[0]?.content?.parts || []) {
             if (part.inlineData) return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
         }

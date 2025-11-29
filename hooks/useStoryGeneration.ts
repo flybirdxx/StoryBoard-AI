@@ -1,4 +1,5 @@
-import { useState, useCallback } from 'react';
+
+import { useState, useCallback, useRef } from 'react';
 import { useStoryStore } from '../store/useStoryStore';
 import { generateStoryScript, analyzeCharacterVisuals, extendStoryScript, optimizeFullStory, generatePlotOptions } from '../services/geminiService';
 import { useImageGeneration } from './useImageGeneration';
@@ -15,6 +16,19 @@ export const useStoryGeneration = () => {
   const [isOptimizingStory, setIsOptimizingStory] = useState(false);
   const [isLoadingOptions, setIsLoadingOptions] = useState(false);
 
+  // Controller for aborting AI requests
+  const analysisAbortControllerRef = useRef<AbortController | null>(null);
+
+  const cancelGeneration = useCallback(() => {
+    if (analysisAbortControllerRef.current) {
+      analysisAbortControllerRef.current.abort();
+      analysisAbortControllerRef.current = null;
+    }
+    setIsScriptLoading(false);
+    setIsAnalyzingAnchors(false);
+    toast.info("任务已终止");
+  }, []);
+
   const startAnalysis = useCallback(async (
     theme: string, 
     images: string[], 
@@ -23,6 +37,13 @@ export const useStoryGeneration = () => {
     ratio: AspectRatio,
     onAnalysisComplete: () => void
   ) => {
+    // Cancel any existing request
+    if (analysisAbortControllerRef.current) {
+      analysisAbortControllerRef.current.abort();
+    }
+    const controller = new AbortController();
+    analysisAbortControllerRef.current = controller;
+
     setIsScriptLoading(true);
     setIsAnalyzingAnchors(true);
     
@@ -36,25 +57,38 @@ export const useStoryGeneration = () => {
     });
 
     try {
-      const anchors = await analyzeCharacterVisuals(images, theme);
+      const anchors = await analyzeCharacterVisuals(images, theme, controller.signal);
+      
+      if (controller.signal.aborted) return;
+
       setDetectedAnchors(anchors);
       onAnalysisComplete();
-    } catch (error) {
+    } catch (error: any) {
+      if (error.name === 'AbortError') {
+         console.log('Analysis aborted');
+         return;
+      }
       console.error("Analysis failed", error);
       toast.error("角色分析失败，请重试");
     } finally {
-      setIsAnalyzingAnchors(false);
-      // Don't turn off isScriptLoading yet if we proceed to review
+      // Only reset these if we haven't been aborted (or if we finished successfully)
+      // Note: We keep isScriptLoading true if successful to transition to modal->generation
+      if (analysisAbortControllerRef.current === controller) {
+         setIsAnalyzingAnchors(false);
+      }
     }
   }, []);
 
   const confirmAndGenerateStory = useCallback(async (finalAnchors: VisualAnchor[]) => {
+    // Re-initialize controller for the script generation phase
+    if (analysisAbortControllerRef.current) analysisAbortControllerRef.current.abort();
+    const controller = new AbortController();
+    analysisAbortControllerRef.current = controller;
+
     setDetectedAnchors(finalAnchors);
     setStory(null);
     setPlotOptions([]);
-    // Init history is handled by first setStory with description
     
-    // Ensure loading state is on
     setIsScriptLoading(true);
 
     const currentSettings = useStoryStore.getState().settings;
@@ -66,21 +100,32 @@ export const useStoryGeneration = () => {
         finalAnchors,
         currentSettings.artStyle,
         currentSettings.mode,
-        currentSettings.aspectRatio
+        currentSettings.aspectRatio,
+        controller.signal
       );
+      
+      if (controller.signal.aborted) return;
 
       const storyWithMode = { ...storyData, mode: currentSettings.mode };
-      setStory(storyWithMode, "故事生成"); // Pushes to history
+      setStory(storyWithMode, "故事生成"); 
       setIsScriptLoading(false);
       toast.success("剧本已生成，正在绘制分镜...");
 
       // Trigger image generation
       await generateImagesForScenes(storyData.scenes, storyData.seed);
 
-    } catch (error) {
+    } catch (error: any) {
+      if (error.name === 'AbortError') {
+         console.log('Script generation aborted');
+         return;
+      }
       console.error("Story generation error:", error);
       toast.error("生成故事时出错");
       setIsScriptLoading(false);
+    } finally {
+       if (analysisAbortControllerRef.current === controller) {
+          analysisAbortControllerRef.current = null;
+       }
     }
   }, [generateImagesForScenes]);
 
@@ -170,6 +215,7 @@ export const useStoryGeneration = () => {
     isLoadingOptions,
     startAnalysis,
     confirmAndGenerateStory,
+    cancelGeneration, // Exposed cancel function
     handleExtendStory,
     handleOptimizeStory,
     handleGetOptions

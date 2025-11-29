@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Sparkles, X, Palette, Plus, Users, PenTool, LayoutTemplate, Square, Monitor, Wand2, Loader2 } from 'lucide-react';
+import { Sparkles, X, Palette, Plus, Users, PenTool, LayoutTemplate, Square, Monitor, Wand2, Loader2, StopCircle } from 'lucide-react';
 import { ArtStyle, GenerationMode, AspectRatio, Character } from '../types';
 import { ART_STYLE_OPTIONS, ASPECT_RATIOS } from '../constants';
 import CharacterWorkshop from './CharacterWorkshop';
@@ -10,9 +10,10 @@ import { toast } from 'sonner';
 interface StoryFormProps {
   onSubmit: (theme: string, images: string[], artStyle: ArtStyle, mode: GenerationMode, ratio: AspectRatio) => void;
   isGenerating: boolean;
+  onCancel?: () => void;
 }
 
-const StoryForm: React.FC<StoryFormProps> = ({ onSubmit, isGenerating }) => {
+const StoryForm: React.FC<StoryFormProps> = ({ onSubmit, isGenerating, onCancel }) => {
   const { savedCharacters, addSavedCharacter } = useStoryStore();
   const [theme, setTheme] = useState('');
   const [images, setImages] = useState<string[]>([]);
@@ -226,20 +227,28 @@ const StoryForm: React.FC<StoryFormProps> = ({ onSubmit, isGenerating }) => {
                   className="w-full flex-1 bg-black/20 border border-white/10 rounded-xl p-4 text-sm text-white placeholder-slate-600 focus:ring-1 focus:ring-indigo-500 outline-none resize-none leading-relaxed" 
                 />
                 
-                <button type="submit" disabled={!theme || images.length === 0 || isGenerating} className={`w-full py-4 px-6 rounded-xl font-bold text-base flex items-center justify-center gap-3 transition-all shadow-xl relative overflow-hidden group ${(!theme || images.length === 0 || isGenerating) ? 'bg-slate-800 text-slate-500 cursor-not-allowed' : 'bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white shadow-indigo-500/25'}`}>
-                   {isGenerating ? (
-                      <>
-                        <div className="absolute inset-0 bg-white/10 animate-pulse"></div>
-                        <Loader2 className="w-5 h-5 animate-spin" />
-                        <span>AI 正在分析与生成...</span>
-                      </>
-                   ) : (
-                      <>
-                        <Sparkles className="w-5 h-5 group-hover:rotate-12 transition-transform" />
-                        <span>生成项目</span>
-                      </>
-                   )}
-                </button>
+                <div className="flex gap-3">
+                    <button type="submit" disabled={!theme || images.length === 0 || isGenerating} className={`flex-1 py-4 px-6 rounded-xl font-bold text-base flex items-center justify-center gap-3 transition-all shadow-xl relative overflow-hidden group ${(!theme || images.length === 0 || isGenerating) ? 'bg-slate-800 text-slate-500 cursor-not-allowed' : 'bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white shadow-indigo-500/25'}`}>
+                      {isGenerating ? (
+                          <>
+                            <div className="absolute inset-0 bg-white/10 animate-pulse"></div>
+                            <Loader2 className="w-5 h-5 animate-spin" />
+                            <span>AI 正在分析与生成...</span>
+                          </>
+                      ) : (
+                          <>
+                            <Sparkles className="w-5 h-5 group-hover:rotate-12 transition-transform" />
+                            <span>生成项目</span>
+                          </>
+                      )}
+                    </button>
+                    {isGenerating && onCancel && (
+                       <button type="button" onClick={onCancel} className="px-6 py-4 rounded-xl font-bold text-red-400 border border-red-500/30 hover:bg-red-500/10 transition-all flex items-center justify-center gap-2">
+                          <StopCircle className="w-5 h-5" />
+                          <span>取消</span>
+                       </button>
+                    )}
+                </div>
              </div>
           </div>
        </form>

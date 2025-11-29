@@ -22,6 +22,9 @@ const CharacterWorkshop: React.FC<CharacterWorkshopProps> = ({ onClose, onSave }
   const [aspectRatio, setAspectRatio] = useState<AspectRatio>('1:1');
   const [artStyle, setArtStyle] = useState<ArtStyle>('电影写实');
   const [customStyle, setCustomStyle] = useState('');
+  
+  // Abort controller to handle cancellation
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // Initialize canvas
   useEffect(() => {
@@ -38,6 +41,23 @@ const CharacterWorkshop: React.FC<CharacterWorkshopProps> = ({ onClose, onSave }
       }
     }
   }, []);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
+
+  const handleCloseInternal = () => {
+    // Abort pending request if any
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    onClose();
+  };
 
   const startDrawing = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
@@ -101,17 +121,40 @@ const CharacterWorkshop: React.FC<CharacterWorkshopProps> = ({ onClose, onSave }
        styleToUse = customStyle.trim();
     }
 
+    // Abort any existing request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+
+    // Create new controller
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     setIsGenerating(true);
     try {
       const sketchData = canvasRef.current?.toDataURL('image/jpeg', 0.8) || null;
-      const imageUrl = await generateCharacterDesign(prompt, sketchData, styleToUse, aspectRatio);
+      const imageUrl = await generateCharacterDesign(
+        prompt, 
+        sketchData, 
+        styleToUse, 
+        aspectRatio, 
+        controller.signal
+      );
       setGeneratedImage(imageUrl);
       toast.success("生成成功");
-    } catch (error) {
+    } catch (error: any) {
+      if (error.name === 'AbortError') {
+         console.log("Generation aborted");
+         return; // Don't show error toast for cancellation
+      }
       console.error("Failed to generate character", error);
       toast.error("生成失败，请重试");
     } finally {
-      setIsGenerating(false);
+      // Only turn off loading if this is still the active request
+      if (abortControllerRef.current === controller) {
+         setIsGenerating(false);
+         abortControllerRef.current = null;
+      }
     }
   };
 
@@ -124,7 +167,7 @@ const CharacterWorkshop: React.FC<CharacterWorkshopProps> = ({ onClose, onSave }
         imageUrl: generatedImage
       });
       toast.success("角色已保存");
-      onClose();
+      handleCloseInternal();
     }
   };
 
@@ -149,7 +192,7 @@ const CharacterWorkshop: React.FC<CharacterWorkshopProps> = ({ onClose, onSave }
              <PenTool className="w-5 h-5 text-indigo-400" />
              <h2 className="text-lg font-bold text-white">角色工坊</h2>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-lg text-slate-400 hover:text-white transition-colors">
+          <button onClick={handleCloseInternal} className="p-2 hover:bg-white/10 rounded-lg text-slate-400 hover:text-white transition-colors">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -292,6 +335,12 @@ const CharacterWorkshop: React.FC<CharacterWorkshopProps> = ({ onClose, onSave }
                     <Loader2 className="relative w-12 h-12 text-indigo-400 animate-spin mb-4" />
                   </div>
                   <p className="text-sm font-bold text-indigo-200 tracking-wider animate-pulse">正在绘制角色设计图...</p>
+                  <button 
+                    onClick={() => abortControllerRef.current?.abort()}
+                    className="mt-6 px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 rounded-lg text-xs font-bold transition-colors"
+                  >
+                    取消生成
+                  </button>
                 </div>
               )}
 

@@ -1,18 +1,34 @@
 
 import React, { useState, useEffect } from 'react';
-import { Scene, GenerationMode } from '../types';
-import { Loader2, Image as ImageIcon, RefreshCw, Wand2, Volume2, Film, Edit3, CheckSquare, Square, Maximize2, Tag, Plus, X, Sparkles, PenTool } from 'lucide-react';
+import { Scene, GenerationMode, ArtStyle } from '../types';
+import { Loader2, Image as ImageIcon, RefreshCw, Wand2, Volume2, Film, Edit3, CheckSquare, Square, Maximize2, Tag, Plus, X, Sparkles, PenTool, Palette } from 'lucide-react';
 import { polishText } from '../services/geminiService';
 
 export const SubtitleOverlay: React.FC<{ text: string, mode: GenerationMode }> = ({ text, mode }) => {
-  if (mode === 'comic') {
-    return (
-       <div className="absolute bottom-0 left-0 right-0 bg-white border-t-2 border-black p-2 z-20 min-h-[48px] flex items-center justify-center">
-          <p className="text-black text-[10px] md:text-xs font-bold leading-tight font-comic text-center line-clamp-3">{text}</p>
-       </div>
-    );
-  }
-  return <div className="absolute bottom-0 left-0 right-0 pb-8 pt-16 px-10 text-center z-20 bg-gradient-to-t from-black/90 via-black/50 to-transparent"><p className="text-white text-lg font-medium leading-relaxed drop-shadow-lg tracking-wide" style={{ textShadow: '0 2px 10px rgba(0,0,0,0.8)' }}>{text}</p></div>;
+  // In Storyboard mode, use the cinematic subtitle style
+  return (
+    <div className="absolute bottom-0 left-0 right-0 pb-8 pt-16 px-10 text-center z-20 bg-gradient-to-t from-black/90 via-black/50 to-transparent pointer-events-none">
+       <p className="text-white text-lg font-medium leading-relaxed drop-shadow-lg tracking-wide" style={{ textShadow: '0 2px 10px rgba(0,0,0,0.8)' }}>
+          {text}
+       </p>
+    </div>
+  );
+};
+
+export const ComicSpeechBubble: React.FC<{ text: string }> = ({ text }) => {
+  return (
+    <div className="absolute top-4 left-4 right-4 z-20 pointer-events-none">
+      <div className="bg-white border-2 border-black rounded-[2rem] rounded-tl-none p-4 shadow-[4px_4px_0px_rgba(0,0,0,0.2)] max-w-[90%] float-left relative animate-in zoom-in-95 duration-300">
+        <p className="text-black text-xs md:text-sm font-bold leading-snug font-comic">
+          {text}
+        </p>
+        {/* Bubble Tail */}
+        <div className="absolute -left-[2px] -top-[14px] w-4 h-4 bg-white border-l-2 border-t-2 border-black transform -skew-x-12 rotate-45 z-10"></div>
+        <div className="absolute -left-[2px] -top-[12px] w-5 h-5 bg-white transform rotate-45 z-20"></div> 
+        {/* Covering the internal border of the tail */}
+      </div>
+    </div>
+  );
 };
 
 // Enhanced Loading State
@@ -31,7 +47,7 @@ export const SkeletonSceneCard: React.FC<{ isComic: boolean }> = ({ isComic }) =
 
    if (isComic) {
       return (
-         <div className="flex-1 bg-white border-2 border-black relative h-full min-h-[400px] overflow-hidden group">
+         <div className="flex-1 bg-white border-2 border-black relative h-full min-h-[300px] overflow-hidden group">
             {/* Paper Texture Background */}
             <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20"></div>
             
@@ -51,13 +67,6 @@ export const SkeletonSceneCard: React.FC<{ isComic: boolean }> = ({ isComic }) =
                      <div className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-pulse delay-300"></div>
                   </div>
                </div>
-            </div>
-            
-            {/* Placeholder Layout Lines */}
-            <div className="absolute inset-0 border-[10px] border-transparent opacity-10">
-               <div className="w-full h-full border border-dashed border-black"></div>
-               <div className="absolute top-1/2 left-0 right-0 h-px bg-black border-dashed"></div>
-               <div className="absolute left-1/2 top-0 bottom-0 w-px bg-black border-dashed"></div>
             </div>
          </div>
       );
@@ -87,6 +96,7 @@ export const SceneCard: React.FC<{
   index: number; 
   mode: GenerationMode;
   isSelected: boolean;
+  currentArtStyle?: ArtStyle;
   onToggleSelect: () => void;
   onRetry: () => void;
   onModify: (feedback: string) => void; 
@@ -94,7 +104,8 @@ export const SceneCard: React.FC<{
   onUpdateTags: (tags: string[]) => void;
   onGenerateAudio: () => void;
   onGenerateVideo: () => void;
-}> = ({ scene, index, mode, isSelected, onToggleSelect, onRetry, onModify, onUpdate, onUpdateTags, onGenerateAudio, onGenerateVideo }) => {
+  onGenerateStylePreview: () => void;
+}> = ({ scene, index, mode, isSelected, currentArtStyle, onToggleSelect, onRetry, onModify, onUpdate, onUpdateTags, onGenerateAudio, onGenerateVideo, onGenerateStylePreview }) => {
   const [isEditingFeedback, setIsEditingFeedback] = useState(false);
   const [feedback, setFeedback] = useState("");
   const [isEditingText, setIsEditingText] = useState(false);
@@ -104,6 +115,7 @@ export const SceneCard: React.FC<{
   const [isPolishingVisual, setIsPolishingVisual] = useState(false);
   const [newTag, setNewTag] = useState("");
   const [isAddingTag, setIsAddingTag] = useState(false);
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
 
   useEffect(() => {
     setEditNarrative(scene.narrative);
@@ -155,11 +167,11 @@ export const SceneCard: React.FC<{
 
   if (isComicMode) {
      return (
-        <div className={`group/card relative h-full w-full flex flex-col bg-transparent transition-all duration-300 ${isSelected ? 'ring-4 ring-indigo-500/50 z-10' : ''}`}>
-           {/* Comic Panel Container - Takes full height of grid cell */}
-           <div className={`flex-1 w-full h-full border-4 bg-white shadow-[4px_4px_0px_rgba(0,0,0,0.8)] relative overflow-hidden flex flex-col transition-colors duration-300 ${isSelected ? 'border-indigo-600' : 'border-black'}`}>
+        <div className={`group/card relative h-full w-full flex flex-col transition-all duration-300 ${isSelected ? 'z-10 transform scale-[1.02]' : ''}`}>
+           {/* Comic Panel Container */}
+           <div className={`flex-1 w-full h-full min-h-[250px] bg-white border-[3px] shadow-[6px_6px_0px_rgba(0,0,0,0.8)] relative overflow-hidden flex flex-col transition-colors duration-300 ${isSelected ? 'border-indigo-600 shadow-indigo-500/30' : 'border-black'}`}>
               
-              <div className="relative w-full h-full flex-1 bg-slate-100 overflow-hidden">
+              <div className="relative w-full h-full flex-1 bg-white overflow-hidden">
                  {scene.isLoadingImage ? (
                     <SkeletonSceneCard isComic={true} />
                  ) : scene.imageUrl ? (
@@ -167,9 +179,10 @@ export const SceneCard: React.FC<{
                        <img 
                           src={scene.imageUrl} 
                           alt={`Panel ${index + 1}`} 
-                          className={`w-full h-full object-cover transition-transform duration-700 ease-out ${isSelected ? 'scale-110' : 'hover:scale-105'}`} 
+                          className={`w-full h-full object-cover transition-transform duration-700 ease-out ${isSelected ? 'scale-105' : 'hover:scale-105'}`} 
                        />
-                       {!isEditingText && <SubtitleOverlay text={scene.narrative} mode={mode} />}
+                       {/* Speech Bubble Overlay */}
+                       {!isEditingText && <ComicSpeechBubble text={scene.narrative} />}
                     </>
                  ) : (
                     <div className="w-full h-full flex flex-col items-center justify-center text-slate-400 p-4 text-center bg-slate-50">
@@ -189,32 +202,40 @@ export const SceneCard: React.FC<{
                  )}
                  
                  {/* Selection Checkbox */}
-                 <div className="absolute top-2 left-2 z-30 opacity-0 group-hover/card:opacity-100 data-[selected=true]:opacity-100 transition-opacity" data-selected={isSelected}>
+                 <div className="absolute bottom-2 right-2 z-30 opacity-0 group-hover/card:opacity-100 data-[selected=true]:opacity-100 transition-opacity" data-selected={isSelected}>
                    <button onClick={onToggleSelect} className={`p-1 border-2 border-black shadow-[2px_2px_0px_rgba(0,0,0,1)] transition-all ${isSelected ? 'bg-indigo-500 text-white' : 'bg-white text-black'}`}>{isSelected ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}</button>
                  </div>
               </div>
 
               {/* Text Editor Overlay */}
               {isEditingText && (
-                 <div className="absolute inset-0 bg-white z-40 p-3 flex flex-col gap-2 border-4 border-black animate-in fade-in zoom-in-95">
-                    <label className="text-[10px] font-bold uppercase">Caption</label>
-                    <textarea value={editNarrative} onChange={(e) => setEditNarrative(e.target.value)} className="flex-1 w-full p-2 border-2 border-slate-200 text-xs font-comic focus:border-black outline-none resize-none" autoFocus />
-                    <div className="flex gap-2 justify-end"><button onClick={() => setIsEditingText(false)} className="text-[10px] font-bold underline">Cancel</button><button onClick={() => handleTextSave(false)} className="px-3 py-1 bg-black text-white text-[10px] font-bold hover:bg-slate-800">Save</button></div>
+                 <div className="absolute inset-0 bg-white z-40 p-4 flex flex-col gap-3 border-4 border-black animate-in fade-in zoom-in-95">
+                    <label className="text-xs font-bold uppercase tracking-wider">Edit Dialogue</label>
+                    <textarea value={editNarrative} onChange={(e) => setEditNarrative(e.target.value)} className="flex-1 w-full p-2 border-2 border-slate-200 text-sm font-comic focus:border-black outline-none resize-none bg-slate-50" autoFocus />
+                    <div className="flex gap-2 justify-end">
+                       <button onClick={() => setIsEditingText(false)} className="text-xs font-bold underline px-2">Cancel</button>
+                       <button onClick={() => handleTextSave(false)} className="px-4 py-2 bg-black text-white text-xs font-bold hover:bg-slate-800 transition-colors">Save Text</button>
+                    </div>
                  </div>
               )}
 
               {/* Modify Visuals Overlay */}
               {isEditingFeedback && (
-                 <div className="absolute inset-0 bg-black/90 z-50 p-4 flex flex-col justify-center text-white">
-                    <h5 className="text-xs font-bold mb-2">Modify Panel Visuals</h5>
-                    <textarea value={feedback} onChange={(e) => setFeedback(e.target.value)} className="w-full h-20 bg-white/10 border border-white/20 p-2 text-xs mb-2" placeholder="Describe changes..." />
-                    <div className="flex gap-2 justify-end"><button onClick={() => setIsEditingFeedback(false)} className="text-xs text-slate-400">Cancel</button><button onClick={handleModifySubmit} className="text-xs font-bold text-yellow-400">Apply</button></div>
+                 <div className="absolute inset-0 bg-black/90 z-50 p-6 flex flex-col justify-center text-white">
+                    <h5 className="text-sm font-bold mb-3">Modify Panel Visuals</h5>
+                    <textarea value={feedback} onChange={(e) => setFeedback(e.target.value)} className="w-full h-32 bg-white/10 border border-white/20 p-3 text-sm mb-3 rounded-lg" placeholder="Describe changes..." />
+                    <div className="flex gap-3 justify-end">
+                       <button onClick={() => setIsEditingFeedback(false)} className="text-sm text-slate-400">Cancel</button>
+                       <button onClick={handleModifySubmit} className="text-sm font-bold text-yellow-400 hover:text-yellow-300">Apply</button>
+                    </div>
                  </div>
               )}
            </div>
            
-           {/* Panel Number Badge */}
-           <div className={`absolute -top-2 -left-2 w-7 h-7 rounded-full flex items-center justify-center font-black text-xs border-2 shadow-md z-20 transition-colors pointer-events-none ${isSelected ? 'bg-indigo-600 text-white border-white' : 'bg-white text-black border-black'}`}>{index + 1}</div>
+           {/* Panel Number Badge (Overlapping Border) */}
+           <div className={`absolute -top-3 -left-3 w-8 h-8 rounded-full flex items-center justify-center font-black text-sm border-2 shadow-md z-20 transition-colors pointer-events-none ${isSelected ? 'bg-indigo-600 text-white border-white' : 'bg-black text-white border-white'}`}>
+              {index + 1}
+           </div>
         </div>
      );
   }
@@ -270,6 +291,19 @@ export const SceneCard: React.FC<{
                       <textarea value={feedback} onChange={(e) => setFeedback(e.target.value)} placeholder="E.g., Make the lighting darker, change the angle to low shot..." className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-sm text-white focus:ring-1 focus:ring-purple-500 focus:border-purple-500 outline-none resize-none h-32 placeholder-slate-500 shadow-inner" autoFocus />
                       <div className="flex gap-3 justify-end"><button type="button" onClick={() => setIsEditingFeedback(false)} className="px-4 py-2 text-xs font-bold text-slate-400 hover:text-white transition-colors">Cancel</button><button type="submit" disabled={!feedback.trim()} className="px-6 py-2 bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-purple-500/20 disabled:opacity-50 disabled:cursor-not-allowed">Apply Changes</button></div>
                    </form>
+                </div>
+             )}
+             
+             {/* Style Preview Modal */}
+             {showPreviewModal && scene.stylePreviewUrl && (
+                <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/90 p-8 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="relative max-w-full max-h-full flex flex-col items-center">
+                        <img src={scene.stylePreviewUrl} className="max-w-full max-h-[80vh] rounded-lg shadow-2xl border border-white/10" />
+                        <div className="mt-4 flex gap-4">
+                           <a href={scene.stylePreviewUrl} download={`Scene_${scene.id}_StylePreview.png`} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-bold flex items-center gap-2"><ImageIcon className="w-4 h-4" /> Download</a>
+                           <button onClick={() => setShowPreviewModal(false)} className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg text-sm font-bold">Close</button>
+                        </div>
+                    </div>
                 </div>
              )}
            </div>
@@ -351,6 +385,17 @@ export const SceneCard: React.FC<{
                  ) : (
                     <button onClick={onGenerateVideo} disabled={scene.isLoadingVideo || !scene.imageUrl} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-xs font-medium text-slate-400 hover:text-purple-300 transition-colors border border-white/5 disabled:opacity-50">
                        {scene.isLoadingVideo ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Film className="w-3.5 h-3.5" />} Generate Video (Veo)
+                    </button>
+                 )}
+                 
+                 {/* Style Preview Button */}
+                 {scene.stylePreviewUrl ? (
+                     <button onClick={() => setShowPreviewModal(true)} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-pink-500/10 text-pink-300 text-xs font-bold border border-pink-500/20 hover:bg-pink-500/20 transition-colors">
+                        <Palette className="w-3.5 h-3.5" /> View Style
+                     </button>
+                 ) : (
+                    <button onClick={onGenerateStylePreview} disabled={scene.isLoadingStylePreview} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-xs font-medium text-slate-400 hover:text-pink-300 transition-colors border border-white/5 disabled:opacity-50" title={`Generate Style Preview (${currentArtStyle || 'Current Style'})`}>
+                       {scene.isLoadingStylePreview ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Palette className="w-3.5 h-3.5" />} Style Preview
                     </button>
                  )}
               </div>

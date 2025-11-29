@@ -63,6 +63,7 @@ export const storageService = {
     // 1. Process Scenes Images
     for (const scene of clonedStory.scenes) {
       scene.imageUrl = await processImage(scene.imageUrl);
+      scene.stylePreviewUrl = await processImage(scene.stylePreviewUrl);
     }
 
     // 2. Process Settings (Original Images)
@@ -100,6 +101,7 @@ export const storageService = {
     // 1. Restore Scenes
     for (const scene of storedData.scenes) {
       scene.imageUrl = processBlob(scene.imageUrl);
+      scene.stylePreviewUrl = processBlob(scene.stylePreviewUrl);
     }
 
     // 2. Restore Settings
@@ -137,7 +139,10 @@ export const storageService = {
 
      // Current Story
      if (story) {
-         story.scenes.forEach(s => tryRevoke(s.imageUrl));
+         story.scenes.forEach(s => {
+             tryRevoke(s.imageUrl);
+             tryRevoke(s.stylePreviewUrl);
+         });
      }
      
      // Settings
@@ -152,7 +157,10 @@ export const storageService = {
 
      // History Snapshots
      history.forEach(h => {
-         h.scenes.forEach(s => tryRevoke(s.imageUrl));
+         h.scenes.forEach(s => {
+             tryRevoke(s.imageUrl);
+             tryRevoke(s.stylePreviewUrl);
+         });
      });
   },
 

@@ -10,6 +10,8 @@ export interface Scene {
   videoUrl?: string;
   videoCost?: string; // Estimated cost of the generated video
   isLoadingVideo?: boolean;
+  stylePreviewUrl?: string; // Generated style reference image
+  isLoadingStylePreview?: boolean;
   tags?: string[]; // Custom tags for organization
   characters?: string[]; // Names of characters appearing in this scene
 }

@@ -14,6 +14,9 @@ import { useStoryStore } from '../store/useStoryStore';
 import { useStoryGeneration } from '../hooks/useStoryGeneration';
 import { useImageGeneration } from '../hooks/useImageGeneration';
 import { useMediaGeneration } from '../hooks/useMediaGeneration';
+import { generateStylePreview } from '../services/geminiService';
+import { ART_STYLE_OPTIONS } from '../constants';
+import { toast } from 'sonner';
 
 interface StoryboardProps {
   onExport: (selectedSceneIds: number[], config: ExportConfig) => void;
@@ -23,6 +26,7 @@ const Storyboard: React.FC<StoryboardProps> = ({ onExport }) => {
   // Store State
   const { 
     story, 
+    settings,
     history, 
     historyIndex, 
     plotOptions, 
@@ -115,28 +119,33 @@ const Storyboard: React.FC<StoryboardProps> = ({ onExport }) => {
   const handleUpdateTags = (sceneId: number, tags: string[]) => {
       updateScene(sceneId, { tags });
   };
+  
+  const handleGenerateStylePreview = async (sceneId: number) => {
+      updateScene(sceneId, { isLoadingStylePreview: true }, false);
+      try {
+          // Find the description of the current art style
+          const currentStyle = settings.artStyle;
+          const styleOption = ART_STYLE_OPTIONS.find(opt => opt.id === currentStyle);
+          const styleDesc = styleOption ? styleOption.desc : currentStyle; // Use label/id as desc if custom
+
+          // Use the prompt from the scene combined with the style
+          const scene = story.scenes.find(s => s.id === sceneId);
+          if (!scene) return;
+          
+          const previewUrl = await generateStylePreview(currentStyle, `${styleDesc}. Scene context: ${scene.visual_prompt}`);
+          
+          updateScene(sceneId, { isLoadingStylePreview: false, stylePreviewUrl: previewUrl }, false); // Persisted
+          toast.success("风格预览图生成成功");
+      } catch (error) {
+          console.error("Style preview failed", error);
+          toast.error("生成风格预览失败");
+          updateScene(sceneId, { isLoadingStylePreview: false }, false);
+      }
+  };
 
   const isComicMode = story.mode === 'comic';
   const canUndo = historyIndex > 0;
   const canRedo = historyIndex < history.length - 1;
-
-  // Helper for Comic Grid Layout logic
-  const getComicSpanClass = (index: number) => {
-     // A repeated pattern for visual variety in comic grid
-     // Based on 12-column grid
-     const pattern = index % 5;
-     
-     // Significantly increased min-heights for better large screen experience
-     if (index === 0) return 'col-span-12 md:row-span-2 min-h-[500px] lg:min-h-[600px]'; // Hero Panel
-     
-     switch (pattern) {
-        case 1: return 'col-span-6 md:col-span-7 min-h-[400px] lg:min-h-[500px]'; // Wide
-        case 2: return 'col-span-6 md:col-span-5 min-h-[400px] lg:min-h-[500px]'; // Narrow
-        case 3: return 'col-span-6 md:col-span-4 min-h-[400px] lg:min-h-[500px]'; // Small
-        case 4: return 'col-span-6 md:col-span-8 min-h-[400px] lg:min-h-[500px]'; // Wide
-        default: return 'col-span-12 md:col-span-6 min-h-[400px] lg:min-h-[500px]'; // Half
-     }
-  };
 
   // Reusable component for Story Extension UI (Continue/Options)
   const renderStoryExtensionControls = () => (
@@ -199,6 +208,7 @@ const Storyboard: React.FC<StoryboardProps> = ({ onExport }) => {
                 index={index}
                 mode="storyboard"
                 isSelected={selectedScenes.includes(scene.id)}
+                currentArtStyle={settings.artStyle}
                 onToggleSelect={() => toggleSelectScene(scene.id)}
                 onRetry={() => handleRetryImage(scene.id)}
                 onModify={(feedback) => handleModifyImage(scene.id, feedback)}
@@ -206,11 +216,32 @@ const Storyboard: React.FC<StoryboardProps> = ({ onExport }) => {
                 onUpdateTags={(tags) => handleUpdateTags(scene.id, tags)}
                 onGenerateAudio={() => handleGenerateAudio(scene.id, scene.narrative)}
                 onGenerateVideo={() => handleGenerateVideo(scene.id)}
+                onGenerateStylePreview={() => handleGenerateStylePreview(scene.id)}
               />
            </div>
        </div>
     );
   };
+
+  /**
+   * Helper to determine grid span class for Comic Mode
+   * Implements a rhythm: Hero (12) -> Half (6+6) -> Thirds (4+4+4) -> Repeat
+   */
+  const getComicSpanClass = (index: number) => {
+      const patternIndex = index % 6; // Pattern repeats every 6 panels
+      if (patternIndex === 0) return 'col-span-12 md:row-span-2 min-h-[400px]'; // Hero Panel
+      if (patternIndex === 1 || patternIndex === 2) return 'col-span-12 md:col-span-6 min-h-[300px]'; // Half Width
+      return 'col-span-12 md:col-span-4 min-h-[250px]'; // Third Width
+  };
+
+  // Comic Page Chunking
+  const SCENES_PER_PAGE = 6;
+  const chunkedScenes = [];
+  if (isComicMode) {
+     for (let i = 0; i < story.scenes.length; i += SCENES_PER_PAGE) {
+        chunkedScenes.push(story.scenes.slice(i, i + SCENES_PER_PAGE));
+     }
+  }
 
   return (
     <div className="flex flex-col h-full animate-in fade-in duration-700 relative">
@@ -305,56 +336,67 @@ const Storyboard: React.FC<StoryboardProps> = ({ onExport }) => {
       {/* VIEW MODE: COMIC PAGE VS STORYBOARD LIST */}
       {isComicMode ? (
         <div className="flex-1 overflow-y-auto custom-scrollbar px-4 pb-32">
-           {/* COMIC SHEET CONTAINER */}
-           {/* Increased max-width significantly for better full screen experience */}
-           <div className="w-full max-w-[95%] 2xl:max-w-screen-2xl mx-auto bg-[#fdfbf7] p-4 md:p-12 shadow-[0_20px_60px_rgba(0,0,0,0.5)] border border-slate-300 relative mt-4">
-               {/* Paper Texture Overlay */}
-               <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-10 pointer-events-none mix-blend-multiply"></div>
-               
-               {/* Header Area */}
-               <div className="relative z-10 mb-10 pb-8 text-center border-b-4 border-black">
-                  <h2 className="text-4xl md:text-6xl lg:text-7xl font-black uppercase tracking-tighter text-black mb-4 leading-none">{story.title}</h2>
-                  <div className="flex items-center justify-center gap-6 text-sm font-bold font-mono text-slate-600 uppercase tracking-widest">
-                     <span>Issue #01</span>
-                     <span>•</span>
-                     <span>{new Date().toLocaleDateString()}</span>
-                     <span>•</span>
-                     <span>By Gemini 3 Pro</span>
-                  </div>
-               </div>
+           {/* COMIC PAGES LAYOUT */}
+           <div className="w-full max-w-4xl mx-auto space-y-12 mt-8">
+               {chunkedScenes.map((pageScenes, pageIndex) => (
+                  <div key={pageIndex} className="bg-white p-6 md:p-8 shadow-[0_20px_60px_rgba(0,0,0,0.5)] border border-slate-300 relative">
+                     {/* Paper Texture Overlay */}
+                     <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-10 pointer-events-none mix-blend-multiply"></div>
+                     
+                     {/* Header Area (Only on Page 1) */}
+                     {pageIndex === 0 && (
+                        <div className="relative z-10 mb-8 pb-6 text-center border-b-4 border-black">
+                           <h2 className="text-4xl md:text-5xl font-black uppercase tracking-tighter text-black mb-3 leading-none">{story.title}</h2>
+                           <div className="flex items-center justify-center gap-4 text-xs font-bold font-mono text-slate-600 uppercase tracking-widest">
+                              <span>Issue #01</span>
+                              <span>•</span>
+                              <span>{new Date().toLocaleDateString()}</span>
+                              <span>•</span>
+                              <span>By Gemini 3 Pro</span>
+                           </div>
+                        </div>
+                     )}
 
-               {/* Dynamic Grid Layout */}
-               <div className="grid grid-cols-12 gap-4 md:gap-6 relative z-10 auto-rows-min">
-                  {story.scenes.map((scene, index) => (
-                     <div 
-                        key={scene.id} 
-                        id={`scene-${scene.id}`} 
-                        className={`scroll-mt-32 ${getComicSpanClass(index)}`}
-                     >
-                       <SceneCard 
-                         scene={scene} 
-                         index={index}
-                         mode="comic"
-                         isSelected={selectedScenes.includes(scene.id)}
-                         onToggleSelect={() => toggleSelectScene(scene.id)}
-                         onRetry={() => handleRetryImage(scene.id)}
-                         onModify={(feedback) => handleModifyImage(scene.id, feedback)}
-                         onUpdate={(narrative, visual, regen) => handleUpdateSceneText(scene.id, narrative, visual, regen)}
-                         onUpdateTags={(tags) => handleUpdateTags(scene.id, tags)}
-                         onGenerateAudio={() => handleGenerateAudio(scene.id, scene.narrative)}
-                         onGenerateVideo={() => handleGenerateVideo(scene.id)}
-                       />
+                     {/* Dynamic Comic Grid (12 Columns) */}
+                     <div className="grid grid-cols-12 gap-3 md:gap-4 relative z-10">
+                        {pageScenes.map((scene, index) => {
+                           const spanClass = getComicSpanClass(pageIndex * SCENES_PER_PAGE + index);
+                           return (
+                              <div 
+                                 key={scene.id} 
+                                 id={`scene-${scene.id}`} 
+                                 className={`scroll-mt-32 ${spanClass}`}
+                              >
+                                <SceneCard 
+                                  scene={scene} 
+                                  index={pageIndex * SCENES_PER_PAGE + index}
+                                  mode="comic"
+                                  isSelected={selectedScenes.includes(scene.id)}
+                                  currentArtStyle={settings.artStyle}
+                                  onToggleSelect={() => toggleSelectScene(scene.id)}
+                                  onRetry={() => handleRetryImage(scene.id)}
+                                  onModify={(feedback) => handleModifyImage(scene.id, feedback)}
+                                  onUpdate={(narrative, visual, regen) => handleUpdateSceneText(scene.id, narrative, visual, regen)}
+                                  onUpdateTags={(tags) => handleUpdateTags(scene.id, tags)}
+                                  onGenerateAudio={() => handleGenerateAudio(scene.id, scene.narrative)}
+                                  onGenerateVideo={() => handleGenerateVideo(scene.id)}
+                                  onGenerateStylePreview={() => handleGenerateStylePreview(scene.id)}
+                                />
+                              </div>
+                           );
+                        })}
                      </div>
-                  ))}
-               </div>
 
-               <div className="relative z-10 mt-16 text-center">
-                   <span className="text-sm font-black text-black border-2 border-black px-4 py-1.5 bg-white tracking-widest">PAGE 1</span>
-               </div>
+                     {/* Page Footer */}
+                     <div className="relative z-10 mt-12 text-center">
+                         <span className="text-xs font-black text-black border-2 border-black px-3 py-1 bg-white tracking-widest shadow-[2px_2px_0px_rgba(0,0,0,1)]">PAGE {pageIndex + 1}</span>
+                     </div>
+                  </div>
+               ))}
            </div>
            
            {/* Story Extension */}
-           <div className="max-w-4xl mx-auto">
+           <div className="max-w-4xl mx-auto mt-12">
              {renderStoryExtensionControls()}
            </div>
         </div>
