@@ -100,6 +100,45 @@ const Storyboard: React.FC<StoryboardProps> = ({ onExport }) => {
   const canUndo = historyIndex > 0;
   const canRedo = historyIndex < history.length - 1;
 
+  // Reusable component for Story Extension UI (Continue/Options)
+  const renderStoryExtensionControls = () => (
+    <div className="pb-32 pt-10">
+      {isExtendingStory ? (
+          <div className="flex flex-col items-center justify-center py-16 px-6 bg-[#13161f] rounded-3xl border border-white/5 backdrop-blur-sm animate-pulse shadow-2xl mx-auto max-w-4xl">
+            <div className="relative mb-6"><div className="absolute inset-0 bg-indigo-500 blur-2xl opacity-20 animate-pulse"></div><Loader2 className="relative w-12 h-12 text-indigo-400 animate-spin" /></div>
+            <h3 className="text-2xl font-bold text-white mb-2">Dreaming up the next chapter...</h3><p className="text-sm text-slate-400 font-light">Gemini 3 Pro is crafting scenes & rendering visuals</p>
+          </div>
+      ) : plotOptions.length > 0 ? (
+        <div className="max-w-4xl mx-auto space-y-10">
+          <div className="text-center space-y-3">
+              <h3 className="text-3xl font-bold text-white flex items-center justify-center gap-3"><Sparkles className="w-6 h-6 text-indigo-400" /> Choose the Next Path</h3>
+              <p className="text-slate-400 text-base font-light">Where should the story go from here?</p>
+          </div>
+          <div className="grid grid-cols-1 gap-5">
+              {plotOptions.map((opt) => (
+                <button key={opt.id} onClick={() => handleExtendStory(opt.description)} className="relative group overflow-hidden p-8 bg-[#13161f] hover:bg-[#1A1E29] border border-white/5 hover:border-indigo-500/30 rounded-3xl text-left transition-all duration-300 hover:-translate-y-1 shadow-xl hover:shadow-indigo-500/10">
+                    <div className="absolute top-0 left-0 w-1.5 h-full bg-gradient-to-b from-indigo-500 to-purple-600 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                    <h4 className="font-bold text-xl text-slate-200 mb-3 group-hover:text-indigo-300 transition-colors">{opt.title}</h4>
+                    <p className="text-slate-400 group-hover:text-slate-300 leading-relaxed font-light">{opt.description}</p>
+                    <div className="absolute right-6 bottom-6 opacity-0 group-hover:opacity-100 transition-all transform translate-x-4 group-hover:translate-x-0"><ArrowRight className="w-6 h-6 text-indigo-400" /></div>
+                </button>
+              ))}
+          </div>
+        </div>
+      ) : (
+        <div className="text-center py-20 max-w-4xl mx-auto">
+            <div className="inline-block relative group">
+              <div className="absolute inset-0 bg-gradient-to-r from-indigo-500 to-purple-600 blur-2xl rounded-full opacity-20 group-hover:opacity-40 transition-opacity duration-700"></div>
+              <button onClick={handleGetOptions} disabled={isLoadingOptions} className="relative z-10 flex items-center justify-center gap-3 px-12 py-6 font-bold text-white transition-all duration-300 bg-[#1A1E29] border border-white/10 text-lg rounded-full hover:bg-[#202533] hover:border-indigo-500/30 transform hover:scale-105 disabled:opacity-70 disabled:cursor-not-allowed disabled:transform-none shadow-2xl">
+                  {isLoadingOptions ? (<><Loader2 className="w-5 h-5 animate-spin relative" /><span className="relative">Brainstorming...</span></>) : (<><span>Continue Story</span><ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" /></>)}
+              </button>
+            </div>
+            <p className="mt-6 text-sm text-slate-500 font-medium tracking-wide uppercase">AI-Powered Plot Extension</p>
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <div className="flex flex-col h-full animate-in fade-in duration-700 relative">
       
@@ -192,13 +231,13 @@ const Storyboard: React.FC<StoryboardProps> = ({ onExport }) => {
 
       {/* VIEW MODE: COMIC PAGE VS STORYBOARD LIST */}
       {isComicMode ? (
-        <div className="flex-1 overflow-y-auto custom-scrollbar px-8 pb-32">
-           {/* COMIC SHEET CONTAINER */}
-           <div className="max-w-6xl mx-auto bg-[#fdfbf7] p-6 md:p-12 shadow-[0_0_80px_rgba(0,0,0,0.5)] border border-slate-300 relative mt-4">
+        <div className="flex-1 overflow-y-auto custom-scrollbar px-4 pb-32">
+           {/* COMIC SHEET CONTAINER - Reduced max-width for better scaling on screen */}
+           <div className="max-w-4xl mx-auto bg-[#fdfbf7] p-4 md:p-8 shadow-[0_0_80px_rgba(0,0,0,0.5)] border border-slate-300 relative mt-4">
                <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-10 pointer-events-none mix-blend-multiply"></div>
                
-               <div className="relative z-10 mb-10 border-b-4 border-black pb-6 text-center">
-                  <h2 className="text-4xl md:text-5xl font-black uppercase tracking-tighter text-black mb-2">{story.title}</h2>
+               <div className="relative z-10 mb-8 border-b-4 border-black pb-6 text-center">
+                  <h2 className="text-3xl md:text-5xl font-black uppercase tracking-tighter text-black mb-2">{story.title}</h2>
                   <div className="flex items-center justify-center gap-4 text-xs font-bold font-mono text-slate-600 uppercase tracking-widest">
                      <span>Issue #01</span>
                      <span>•</span>
@@ -208,9 +247,9 @@ const Storyboard: React.FC<StoryboardProps> = ({ onExport }) => {
                   </div>
                </div>
 
-               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 relative z-10 auto-rows-fr">
+               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 relative z-10 auto-rows-fr">
                   {story.scenes.map((scene, index) => (
-                     <div key={scene.id} id={`scene-${scene.id}`} className="scroll-mt-32 h-full">
+                     <div key={scene.id} id={`scene-${scene.id}`} className="scroll-mt-32 h-full aspect-[4/3]">
                        <SceneCard 
                          scene={scene} 
                          index={index}
@@ -231,6 +270,11 @@ const Storyboard: React.FC<StoryboardProps> = ({ onExport }) => {
                <div className="relative z-10 mt-12 text-center">
                    <span className="text-xs font-bold text-black border-2 border-black px-3 py-1 bg-white">PAGE 1</span>
                </div>
+           </div>
+           
+           {/* Enable Story Extension in Comic Mode too */}
+           <div className="max-w-4xl mx-auto">
+             {renderStoryExtensionControls()}
            </div>
         </div>
       ) : (
@@ -256,41 +300,7 @@ const Storyboard: React.FC<StoryboardProps> = ({ onExport }) => {
              ))}
 
              {/* Footer Options Row */}
-             <div className="pb-32 pt-10">
-                {isExtendingStory ? (
-                   <div className="flex flex-col items-center justify-center py-16 px-6 bg-[#13161f] rounded-3xl border border-white/5 backdrop-blur-sm animate-pulse shadow-2xl mx-auto max-w-4xl">
-                      <div className="relative mb-6"><div className="absolute inset-0 bg-indigo-500 blur-2xl opacity-20 animate-pulse"></div><Loader2 className="relative w-12 h-12 text-indigo-400 animate-spin" /></div>
-                      <h3 className="text-2xl font-bold text-white mb-2">Dreaming up the next chapter...</h3><p className="text-sm text-slate-400 font-light">Gemini 3 Pro is crafting scenes & rendering visuals</p>
-                   </div>
-                ) : plotOptions.length > 0 ? (
-                  <div className="max-w-4xl mx-auto space-y-10">
-                    <div className="text-center space-y-3">
-                       <h3 className="text-3xl font-bold text-white flex items-center justify-center gap-3"><Sparkles className="w-6 h-6 text-indigo-400" /> Choose the Next Path</h3>
-                       <p className="text-slate-400 text-base font-light">Where should the story go from here?</p>
-                    </div>
-                    <div className="grid grid-cols-1 gap-5">
-                       {plotOptions.map((opt) => (
-                          <button key={opt.id} onClick={() => handleExtendStory(opt.description)} className="relative group overflow-hidden p-8 bg-[#13161f] hover:bg-[#1A1E29] border border-white/5 hover:border-indigo-500/30 rounded-3xl text-left transition-all duration-300 hover:-translate-y-1 shadow-xl hover:shadow-indigo-500/10">
-                             <div className="absolute top-0 left-0 w-1.5 h-full bg-gradient-to-b from-indigo-500 to-purple-600 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                             <h4 className="font-bold text-xl text-slate-200 mb-3 group-hover:text-indigo-300 transition-colors">{opt.title}</h4>
-                             <p className="text-slate-400 group-hover:text-slate-300 leading-relaxed font-light">{opt.description}</p>
-                             <div className="absolute right-6 bottom-6 opacity-0 group-hover:opacity-100 transition-all transform translate-x-4 group-hover:translate-x-0"><ArrowRight className="w-6 h-6 text-indigo-400" /></div>
-                          </button>
-                       ))}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="text-center py-20 max-w-4xl mx-auto">
-                     <div className="inline-block relative group">
-                        <div className="absolute inset-0 bg-gradient-to-r from-indigo-500 to-purple-600 blur-2xl rounded-full opacity-20 group-hover:opacity-40 transition-opacity duration-700"></div>
-                        <button onClick={handleGetOptions} disabled={isLoadingOptions} className="relative z-10 flex items-center justify-center gap-3 px-12 py-6 font-bold text-white transition-all duration-300 bg-[#1A1E29] border border-white/10 text-lg rounded-full hover:bg-[#202533] hover:border-indigo-500/30 transform hover:scale-105 disabled:opacity-70 disabled:cursor-not-allowed disabled:transform-none shadow-2xl">
-                           {isLoadingOptions ? (<><Loader2 className="w-5 h-5 animate-spin relative" /><span className="relative">Brainstorming...</span></>) : (<><span>Continue Story</span><ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" /></>)}
-                        </button>
-                     </div>
-                     <p className="mt-6 text-sm text-slate-500 font-medium tracking-wide uppercase">AI-Powered Plot Extension</p>
-                  </div>
-                )}
-             </div>
+             {renderStoryExtensionControls()}
           </div>
         </div>
       )}
