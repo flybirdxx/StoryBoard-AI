@@ -126,14 +126,15 @@ const Storyboard: React.FC<StoryboardProps> = ({ onExport }) => {
      // Based on 12-column grid
      const pattern = index % 5;
      
-     if (index === 0) return 'col-span-12 md:row-span-2 min-h-[400px]'; // Hero Panel
+     // Significantly increased min-heights for better large screen experience
+     if (index === 0) return 'col-span-12 md:row-span-2 min-h-[500px] lg:min-h-[600px]'; // Hero Panel
      
      switch (pattern) {
-        case 1: return 'col-span-6 md:col-span-7 min-h-[300px]'; // Wide
-        case 2: return 'col-span-6 md:col-span-5 min-h-[300px]'; // Narrow
-        case 3: return 'col-span-6 md:col-span-4 min-h-[300px]'; // Small
-        case 4: return 'col-span-6 md:col-span-8 min-h-[300px]'; // Wide
-        default: return 'col-span-12 md:col-span-6 min-h-[300px]'; // Half
+        case 1: return 'col-span-6 md:col-span-7 min-h-[400px] lg:min-h-[500px]'; // Wide
+        case 2: return 'col-span-6 md:col-span-5 min-h-[400px] lg:min-h-[500px]'; // Narrow
+        case 3: return 'col-span-6 md:col-span-4 min-h-[400px] lg:min-h-[500px]'; // Small
+        case 4: return 'col-span-6 md:col-span-8 min-h-[400px] lg:min-h-[500px]'; // Wide
+        default: return 'col-span-12 md:col-span-6 min-h-[400px] lg:min-h-[500px]'; // Half
      }
   };
 
@@ -192,7 +193,7 @@ const Storyboard: React.FC<StoryboardProps> = ({ onExport }) => {
     const scene = scenes[index];
     return (
        <div style={style} className="px-4">
-           <div className="max-w-7xl mx-auto pb-12 h-full">
+           <div className="max-w-screen-2xl mx-auto pb-12 h-full">
               <SceneCard 
                 scene={scene} 
                 index={index}
@@ -305,14 +306,15 @@ const Storyboard: React.FC<StoryboardProps> = ({ onExport }) => {
       {isComicMode ? (
         <div className="flex-1 overflow-y-auto custom-scrollbar px-4 pb-32">
            {/* COMIC SHEET CONTAINER */}
-           <div className="max-w-4xl mx-auto bg-[#fdfbf7] p-2 md:p-8 shadow-[0_20px_60px_rgba(0,0,0,0.5)] border border-slate-300 relative mt-4">
+           {/* Increased max-width significantly for better full screen experience */}
+           <div className="w-full max-w-[95%] 2xl:max-w-screen-2xl mx-auto bg-[#fdfbf7] p-4 md:p-12 shadow-[0_20px_60px_rgba(0,0,0,0.5)] border border-slate-300 relative mt-4">
                {/* Paper Texture Overlay */}
                <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-10 pointer-events-none mix-blend-multiply"></div>
                
                {/* Header Area */}
-               <div className="relative z-10 mb-8 pb-6 text-center border-b-4 border-black">
-                  <h2 className="text-3xl md:text-5xl font-black uppercase tracking-tighter text-black mb-2">{story.title}</h2>
-                  <div className="flex items-center justify-center gap-4 text-xs font-bold font-mono text-slate-600 uppercase tracking-widest">
+               <div className="relative z-10 mb-10 pb-8 text-center border-b-4 border-black">
+                  <h2 className="text-4xl md:text-6xl lg:text-7xl font-black uppercase tracking-tighter text-black mb-4 leading-none">{story.title}</h2>
+                  <div className="flex items-center justify-center gap-6 text-sm font-bold font-mono text-slate-600 uppercase tracking-widest">
                      <span>Issue #01</span>
                      <span>•</span>
                      <span>{new Date().toLocaleDateString()}</span>
@@ -322,7 +324,7 @@ const Storyboard: React.FC<StoryboardProps> = ({ onExport }) => {
                </div>
 
                {/* Dynamic Grid Layout */}
-               <div className="grid grid-cols-12 gap-3 relative z-10 auto-rows-min">
+               <div className="grid grid-cols-12 gap-4 md:gap-6 relative z-10 auto-rows-min">
                   {story.scenes.map((scene, index) => (
                      <div 
                         key={scene.id} 
@@ -346,8 +348,8 @@ const Storyboard: React.FC<StoryboardProps> = ({ onExport }) => {
                   ))}
                </div>
 
-               <div className="relative z-10 mt-12 text-center">
-                   <span className="text-xs font-bold text-black border-2 border-black px-3 py-1 bg-white">PAGE 1</span>
+               <div className="relative z-10 mt-16 text-center">
+                   <span className="text-sm font-black text-black border-2 border-black px-4 py-1.5 bg-white tracking-widest">PAGE 1</span>
                </div>
            </div>
            
