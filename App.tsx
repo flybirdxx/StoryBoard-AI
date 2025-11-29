@@ -130,10 +130,13 @@ const App: React.FC = () => {
       <Sidebar 
         currentView={currentView} 
         onChangeView={(view) => {
-           if (view === 'create') createNewStory(); // Reset when going to create
+           // Only reset story if we are going to create view AND not currently generating.
+           // This protects the 'settings' in store which are needed during generation.
+           if (view === 'create' && !isScriptLoading) createNewStory(); 
            setCurrentView(view);
         }} 
-        hasActiveStory={!!story}
+        // Allow navigation to editor if story exists OR if it is currently generating
+        hasActiveStory={!!story || isScriptLoading}
         onOpenSettings={() => setShowSettings(true)}
       />
 
