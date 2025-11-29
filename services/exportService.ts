@@ -542,8 +542,14 @@ export const exportScenes = async (
 
     for (const scene of processedScenes) {
       if (scene.imageUrl) {
-        const base64Data = scene.imageUrl.split(',')[1];
-        folder?.file(`Scene_${String(scene.id + 1).padStart(2, '0')}.png`, base64Data, {base64: true});
+        try {
+            // Fetch blob data (supports blob: and data: URLs)
+            const res = await fetch(scene.imageUrl);
+            const blobData = await res.blob();
+            folder?.file(`Scene_${String(scene.id + 1).padStart(2, '0')}.png`, blobData);
+        } catch (e) {
+            console.error("Failed to add image to zip", e);
+        }
       }
     }
 

@@ -6,9 +6,9 @@ const DB_NAME = 'StoryBoardDB';
 const DB_VERSION = 2;
 const STORE_NAME = 'stories';
 
-// Helpers for Blob <-> Base64 conversion
-const base64ToBlob = async (base64: string): Promise<Blob> => {
-  const res = await fetch(base64);
+// Helpers
+const urlToBlob = async (url: string): Promise<Blob> => {
+  const res = await fetch(url);
   return res.blob();
 };
 
@@ -44,37 +44,37 @@ export const storageService = {
   },
 
   /**
-   * Serializes the story state, converting heavy Base64 strings to Blobs for efficient storage.
+   * Serializes the story state, converting URLs (Blob or Data) to Blobs for storage.
    */
   async prepareForStorage(story: StoryData, settings: any, savedCharacters: Character[]): Promise<any> {
     const clonedStory = JSON.parse(JSON.stringify(story));
     const clonedSettings = JSON.parse(JSON.stringify(settings));
     const clonedChars = JSON.parse(JSON.stringify(savedCharacters));
 
+    const processImage = async (url: string | undefined): Promise<Blob | string | undefined> => {
+        if (!url) return undefined;
+        // Convert both Blob URLs (blob:...) and Data URIs (data:...) to actual Blobs
+        if (url.startsWith('blob:') || url.startsWith('data:')) {
+            return await urlToBlob(url);
+        }
+        return url;
+    };
+
     // 1. Process Scenes Images
     for (const scene of clonedStory.scenes) {
-      if (scene.imageUrl && scene.imageUrl.startsWith('data:')) {
-        scene.imageUrl = await base64ToBlob(scene.imageUrl);
-      }
+      scene.imageUrl = await processImage(scene.imageUrl);
     }
 
     // 2. Process Settings (Original Images)
     if (clonedSettings.originalImages) {
         clonedSettings.originalImages = await Promise.all(
-            clonedSettings.originalImages.map(async (img: any) => {
-                if (typeof img === 'string' && img.startsWith('data:')) {
-                    return await base64ToBlob(img);
-                }
-                return img;
-            })
+            clonedSettings.originalImages.map((img: any) => processImage(img))
         );
     }
 
     // 3. Process Saved Characters
     for (const char of clonedChars) {
-      if (char.imageUrl && char.imageUrl.startsWith('data:')) {
-        char.imageUrl = await base64ToBlob(char.imageUrl);
-      }
+      char.imageUrl = await processImage(char.imageUrl);
     }
 
     return {
@@ -86,35 +86,32 @@ export const storageService = {
   },
 
   /**
-   * Deserializes the story state, converting stored Blobs back to Base64 strings.
+   * Deserializes the story state, converting stored Blobs to lightweight Object URLs.
    */
   async restoreFromStorage(storedData: any): Promise<{ story: StoryData, settings: any, savedCharacters: Character[] }> {
+    // Helper to process blob -> object URL
+    const processBlob = (data: any): string => {
+        if (data instanceof Blob) {
+            return URL.createObjectURL(data);
+        }
+        return data;
+    };
+
     // 1. Restore Scenes
     for (const scene of storedData.scenes) {
-      if (scene.imageUrl instanceof Blob) {
-        scene.imageUrl = await blobToBase64(scene.imageUrl);
-      }
+      scene.imageUrl = processBlob(scene.imageUrl);
     }
 
     // 2. Restore Settings
     const settings = storedData._settings || {};
     if (settings.originalImages) {
-        settings.originalImages = await Promise.all(
-            settings.originalImages.map(async (img: any) => {
-                if (img instanceof Blob) {
-                    return await blobToBase64(img);
-                }
-                return img;
-            })
-        );
+        settings.originalImages = settings.originalImages.map((img: any) => processBlob(img));
     }
 
     // 3. Restore Characters
     const savedCharacters = storedData._savedCharacters || [];
     for (const char of savedCharacters) {
-      if (char.imageUrl instanceof Blob) {
-        char.imageUrl = await blobToBase64(char.imageUrl);
-      }
+      char.imageUrl = processBlob(char.imageUrl);
     }
 
     // Clean up internal fields
@@ -123,6 +120,40 @@ export const storageService = {
     delete story._savedCharacters;
 
     return { story, settings, savedCharacters };
+  },
+
+  /**
+   * Revokes Object URLs to prevent memory leaks when unloading a story.
+   */
+  revokeStoryResources(story: StoryData | null, settings: any, savedCharacters: Character[], history: StoryData[] = []) {
+     const revokedUrls = new Set<string>();
+
+     const tryRevoke = (url: string | undefined) => {
+         if (url && url.startsWith('blob:') && !revokedUrls.has(url)) {
+             URL.revokeObjectURL(url);
+             revokedUrls.add(url);
+         }
+     };
+
+     // Current Story
+     if (story) {
+         story.scenes.forEach(s => tryRevoke(s.imageUrl));
+     }
+     
+     // Settings
+     if (settings && settings.originalImages) {
+         settings.originalImages.forEach((url: any) => {
+             if (typeof url === 'string') tryRevoke(url);
+         });
+     }
+
+     // Saved Characters (Session based)
+     savedCharacters.forEach(c => tryRevoke(c.imageUrl));
+
+     // History Snapshots
+     history.forEach(h => {
+         h.scenes.forEach(s => tryRevoke(s.imageUrl));
+     });
   },
 
   async saveStory(story: StoryData, settings: any, savedCharacters: Character[]): Promise<void> {
@@ -174,7 +205,7 @@ export const storageService = {
         return new Promise((resolve, reject) => {
            const transaction = db.transaction(STORE_NAME, 'readonly');
            const store = transaction.objectStore(STORE_NAME);
-           const request = store.getAll(); // Be careful if too many items, might need cursor
+           const request = store.getAll();
            
            request.onsuccess = async () => {
               // Only return lightweight metadata + thumbnail
@@ -183,9 +214,10 @@ export const storageService = {
                  let thumbnail = null;
                  if (item.scenes && item.scenes.length > 0) {
                     const firstImg = item.scenes.find((s:any) => s.imageUrl)?.imageUrl;
+                    // Note: Images in DB are stored as Blobs
                     if (firstImg instanceof Blob) {
                         thumbnail = await blobToBase64(firstImg);
-                    } else {
+                    } else if (typeof firstImg === 'string') {
                         thumbnail = firstImg;
                     }
                  }
@@ -196,7 +228,7 @@ export const storageService = {
                     createdAt: item.createdAt,
                     lastModified: item.lastModified,
                     mode: item.mode,
-                    thumbnail // Add a thumbnail property to the partial
+                    thumbnail 
                  };
               }));
               

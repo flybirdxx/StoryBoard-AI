@@ -62,12 +62,17 @@ export const useStoryStore = create<StoryState>((set, get) => ({
   },
 
   createNewStory: () => {
+    // Cleanup existing resources to prevent memory leaks
+    const state = get();
+    storageService.revokeStoryResources(state.story, state.settings, state.savedCharacters, state.history);
+
     set({
         story: null,
         history: [],
         historyIndex: -1,
         plotOptions: [],
         detectedAnchors: [],
+        savedCharacters: [], // Reset for new session
         settings: {
             theme: '',
             originalImages: [],
@@ -79,6 +84,10 @@ export const useStoryStore = create<StoryState>((set, get) => ({
   },
 
   loadStory: async (id: string) => {
+    // Cleanup previous resources
+    const state = get();
+    storageService.revokeStoryResources(state.story, state.settings, state.savedCharacters, state.history);
+
     const data = await storageService.loadStory(id);
     if (data) {
         set({

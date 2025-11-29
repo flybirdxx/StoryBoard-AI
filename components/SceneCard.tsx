@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Scene, GenerationMode } from '../types';
-import { Loader2, Image as ImageIcon, RefreshCw, Wand2, Volume2, Film, Edit3, CheckSquare, Square, Maximize2, Tag, Plus, X, Sparkles } from 'lucide-react';
+import { Loader2, Image as ImageIcon, RefreshCw, Wand2, Volume2, Film, Edit3, CheckSquare, Square, Maximize2, Tag, Plus, X, Sparkles, PenTool } from 'lucide-react';
 import { polishText } from '../services/geminiService';
 
 export const SubtitleOverlay: React.FC<{ text: string, mode: GenerationMode }> = ({ text, mode }) => {
@@ -15,27 +15,68 @@ export const SubtitleOverlay: React.FC<{ text: string, mode: GenerationMode }> =
   return <div className="absolute bottom-0 left-0 right-0 pb-8 pt-16 px-10 text-center z-20 bg-gradient-to-t from-black/90 via-black/50 to-transparent"><p className="text-white text-lg font-medium leading-relaxed drop-shadow-lg tracking-wide" style={{ textShadow: '0 2px 10px rgba(0,0,0,0.8)' }}>{text}</p></div>;
 };
 
+// Enhanced Loading State
 export const SkeletonSceneCard: React.FC<{ isComic: boolean }> = ({ isComic }) => {
+   const [loadingText, setLoadingText] = useState("Drafting sketch...");
+   
+   useEffect(() => {
+      const texts = ["Analyzing composition...", "Inking lines...", "Applying shading...", "Adding details...", "Finalizing render..."];
+      let i = 0;
+      const interval = setInterval(() => {
+         setLoadingText(texts[i % texts.length]);
+         i++;
+      }, 2000);
+      return () => clearInterval(interval);
+   }, []);
+
    if (isComic) {
       return (
-         <div className="flex-1 bg-white border-4 border-black relative h-full min-h-[300px] animate-pulse">
-            <div className="w-full h-full bg-slate-200"></div>
-            <div className="absolute bottom-0 left-0 right-0 h-16 bg-slate-100 border-t-2 border-black"></div>
+         <div className="flex-1 bg-white border-2 border-black relative h-full min-h-[250px] overflow-hidden group">
+            {/* Paper Texture Background */}
+            <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20"></div>
+            
+            {/* Animated Scanning Line */}
+            <div className="absolute inset-0 z-10 bg-gradient-to-b from-transparent via-indigo-500/10 to-transparent -translate-y-full animate-[shimmer_2s_infinite]"></div>
+
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 z-20">
+               <div className="relative">
+                  <div className="absolute inset-0 bg-indigo-400 blur-xl opacity-20 animate-pulse"></div>
+                  <PenTool className="w-8 h-8 text-slate-800 animate-bounce" />
+               </div>
+               <div className="flex flex-col items-center">
+                  <p className="text-xs font-bold text-slate-700 uppercase tracking-widest">{loadingText}</p>
+                  <div className="flex gap-1 mt-2">
+                     <div className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-pulse delay-75"></div>
+                     <div className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-pulse delay-150"></div>
+                     <div className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-pulse delay-300"></div>
+                  </div>
+               </div>
+            </div>
+            
+            {/* Placeholder Layout Lines */}
+            <div className="absolute inset-0 border-[10px] border-transparent opacity-10">
+               <div className="w-full h-full border border-dashed border-black"></div>
+               <div className="absolute top-1/2 left-0 right-0 h-px bg-black border-dashed"></div>
+               <div className="absolute left-1/2 top-0 bottom-0 w-px bg-black border-dashed"></div>
+            </div>
          </div>
       );
    }
+
+   // Storyboard Skeleton
    return (
-      <div className="relative bg-[#13161f] overflow-hidden border border-white/5 rounded-3xl shadow-2xl h-[550px] flex flex-col xl:flex-row animate-pulse">
-         <div className="xl:w-2/3 bg-white/5 relative">
+      <div className="relative bg-[#13161f] overflow-hidden border border-white/5 rounded-3xl shadow-2xl h-[550px] flex flex-col xl:flex-row">
+         <div className="xl:w-2/3 bg-white/5 relative overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full animate-[shimmer_2s_infinite]"></div>
             <div className="absolute inset-0 flex items-center justify-center">
                <Loader2 className="w-10 h-10 text-white/20 animate-spin" />
             </div>
          </div>
          <div className="flex-1 border-l border-white/5 p-8 space-y-4">
-             <div className="h-6 w-12 bg-white/10 rounded"></div>
-             <div className="h-4 w-full bg-white/10 rounded"></div>
-             <div className="h-4 w-3/4 bg-white/10 rounded"></div>
-             <div className="h-32 w-full bg-white/5 rounded-xl mt-6"></div>
+             <div className="h-6 w-12 bg-white/10 rounded animate-pulse"></div>
+             <div className="h-4 w-full bg-white/10 rounded animate-pulse delay-75"></div>
+             <div className="h-4 w-3/4 bg-white/10 rounded animate-pulse delay-150"></div>
+             <div className="h-32 w-full bg-white/5 rounded-xl mt-6 animate-pulse delay-200"></div>
          </div>
       </div>
    );
@@ -114,35 +155,46 @@ export const SceneCard: React.FC<{
 
   if (isComicMode) {
      return (
-        <div className={`group/card h-full flex flex-col relative bg-transparent transition-all duration-300 ${isSelected ? 'ring-4 ring-indigo-500/50' : ''}`}>
-           <div className={`flex-1 border-4 bg-white shadow-[8px_8px_0px_rgba(0,0,0,1)] relative overflow-hidden flex flex-col transition-colors duration-300 ${isSelected ? 'border-indigo-600' : 'border-black'}`}>
-              <div className="relative flex-1 bg-slate-100 min-h-[200px] overflow-hidden">
-                 {scene.imageUrl ? (
+        <div className={`group/card relative h-full w-full flex flex-col bg-transparent transition-all duration-300 ${isSelected ? 'ring-4 ring-indigo-500/50 z-10' : ''}`}>
+           {/* Comic Panel Container - Takes full height of grid cell */}
+           <div className={`flex-1 w-full h-full border-4 bg-white shadow-[4px_4px_0px_rgba(0,0,0,0.8)] relative overflow-hidden flex flex-col transition-colors duration-300 ${isSelected ? 'border-indigo-600' : 'border-black'}`}>
+              
+              <div className="relative w-full h-full flex-1 bg-slate-100 overflow-hidden">
+                 {scene.isLoadingImage ? (
+                    <SkeletonSceneCard isComic={true} />
+                 ) : scene.imageUrl ? (
                     <>
-                       <img src={scene.imageUrl} alt={`Panel ${index + 1}`} className={`w-full h-full object-cover transition-transform duration-700 ease-out ${isSelected ? 'scale-110' : 'hover:scale-105'} ${scene.isLoadingImage ? 'opacity-50 blur-sm' : ''}`} />
-                       {!scene.isLoadingImage && !isEditingText && <SubtitleOverlay text={scene.narrative} mode={mode} />}
+                       <img 
+                          src={scene.imageUrl} 
+                          alt={`Panel ${index + 1}`} 
+                          className={`w-full h-full object-cover transition-transform duration-700 ease-out ${isSelected ? 'scale-110' : 'hover:scale-105'}`} 
+                       />
+                       {!isEditingText && <SubtitleOverlay text={scene.narrative} mode={mode} />}
                     </>
                  ) : (
-                    <div className="w-full h-full flex flex-col items-center justify-center text-slate-400 p-4 text-center">
-                       <span className="text-xs font-bold">Image Failed</span>
+                    <div className="w-full h-full flex flex-col items-center justify-center text-slate-400 p-4 text-center bg-slate-50">
+                       <ImageIcon className="w-8 h-8 mb-2 opacity-20" />
+                       <span className="text-[10px] font-bold">Generation Failed</span>
+                       <button onClick={onRetry} className="mt-2 text-[10px] underline hover:text-black">Retry</button>
                     </div>
                  )}
-                 {/* Loading Overlay within image */}
-                 {(scene.isLoadingImage || !scene.imageUrl) && (
-                   <div className="absolute inset-0 flex items-center justify-center bg-black/10">
-                      {scene.isLoadingImage ? <SkeletonSceneCard isComic={true} /> : <button onClick={onRetry} className="text-[10px] underline hover:text-black">Retry</button>}
-                   </div>
-                 )}
 
-                 <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover/card:opacity-100 transition-opacity z-30">
-                     <button onClick={onRetry} className="p-1.5 bg-white border-2 border-black hover:bg-yellow-300 text-black shadow-[2px_2px_0px_rgba(0,0,0,1)] transition-transform active:translate-y-0.5" title="Regenerate"><RefreshCw className="w-3 h-3" /></button>
-                     <button onClick={() => setIsEditingFeedback(true)} className="p-1.5 bg-white border-2 border-black hover:bg-yellow-300 text-black shadow-[2px_2px_0px_rgba(0,0,0,1)] transition-transform active:translate-y-0.5" title="Modify"><Wand2 className="w-3 h-3" /></button>
-                     <button onClick={() => setIsEditingText(true)} className="p-1.5 bg-white border-2 border-black hover:bg-yellow-300 text-black shadow-[2px_2px_0px_rgba(0,0,0,1)] transition-transform active:translate-y-0.5" title="Edit Text"><Edit3 className="w-3 h-3" /></button>
-                 </div>
+                 {/* Hover Actions */}
+                 {!scene.isLoadingImage && (
+                    <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover/card:opacity-100 transition-opacity z-30">
+                        <button onClick={onRetry} className="p-1.5 bg-white border-2 border-black hover:bg-yellow-300 text-black shadow-[2px_2px_0px_rgba(0,0,0,1)] transition-transform active:translate-y-0.5" title="Regenerate"><RefreshCw className="w-3 h-3" /></button>
+                        <button onClick={() => setIsEditingFeedback(true)} className="p-1.5 bg-white border-2 border-black hover:bg-yellow-300 text-black shadow-[2px_2px_0px_rgba(0,0,0,1)] transition-transform active:translate-y-0.5" title="Modify"><Wand2 className="w-3 h-3" /></button>
+                        <button onClick={() => setIsEditingText(true)} className="p-1.5 bg-white border-2 border-black hover:bg-yellow-300 text-black shadow-[2px_2px_0px_rgba(0,0,0,1)] transition-transform active:translate-y-0.5" title="Edit Text"><Edit3 className="w-3 h-3" /></button>
+                    </div>
+                 )}
+                 
+                 {/* Selection Checkbox */}
                  <div className="absolute top-2 left-2 z-30 opacity-0 group-hover/card:opacity-100 data-[selected=true]:opacity-100 transition-opacity" data-selected={isSelected}>
                    <button onClick={onToggleSelect} className={`p-1 border-2 border-black shadow-[2px_2px_0px_rgba(0,0,0,1)] transition-all ${isSelected ? 'bg-indigo-500 text-white' : 'bg-white text-black'}`}>{isSelected ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}</button>
                  </div>
               </div>
+
+              {/* Text Editor Overlay */}
               {isEditingText && (
                  <div className="absolute inset-0 bg-white z-40 p-3 flex flex-col gap-2 border-4 border-black animate-in fade-in zoom-in-95">
                     <label className="text-[10px] font-bold uppercase">Caption</label>
@@ -150,6 +202,8 @@ export const SceneCard: React.FC<{
                     <div className="flex gap-2 justify-end"><button onClick={() => setIsEditingText(false)} className="text-[10px] font-bold underline">Cancel</button><button onClick={() => handleTextSave(false)} className="px-3 py-1 bg-black text-white text-[10px] font-bold hover:bg-slate-800">Save</button></div>
                  </div>
               )}
+
+              {/* Modify Visuals Overlay */}
               {isEditingFeedback && (
                  <div className="absolute inset-0 bg-black/90 z-50 p-4 flex flex-col justify-center text-white">
                     <h5 className="text-xs font-bold mb-2">Modify Panel Visuals</h5>
@@ -158,12 +212,14 @@ export const SceneCard: React.FC<{
                  </div>
               )}
            </div>
-           <div className={`absolute -top-3 -left-3 w-8 h-8 rounded-full flex items-center justify-center font-black text-sm border-2 shadow-lg z-20 transition-colors ${isSelected ? 'bg-indigo-600 text-white border-white' : 'bg-black text-white border-white'}`}>{index + 1}</div>
+           
+           {/* Panel Number Badge */}
+           <div className={`absolute -top-2 -left-2 w-7 h-7 rounded-full flex items-center justify-center font-black text-xs border-2 shadow-md z-20 transition-colors pointer-events-none ${isSelected ? 'bg-indigo-600 text-white border-white' : 'bg-white text-black border-black'}`}>{index + 1}</div>
         </div>
      );
   }
 
-  // STANDARD VIEW
+  // STANDARD STORYBOARD VIEW
   return (
     <div className={`group/card relative bg-[#13161f] overflow-hidden border transition-all duration-500 shadow-2xl rounded-3xl border-white/5 hover:border-white/10 ${isSelected ? 'ring-4 ring-indigo-500' : ''}`}>
       <div className="flex flex-col xl:flex-row h-[650px] xl:h-auto"> 

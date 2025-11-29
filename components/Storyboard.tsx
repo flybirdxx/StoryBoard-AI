@@ -1,9 +1,13 @@
 
-import React, { useState } from 'react';
-import { ExportConfig } from '../types';
+import React, { useState, useRef, useEffect } from 'react';
+import { ExportConfig, Scene } from '../types';
 import { Loader2, RefreshCw, Wand2, ArrowRight, Volume2, Download, CheckSquare, Square, Maximize2, RotateCcw, RotateCw, History, PlayCircle, Type, Film, Sparkles, Tag, Plus, X, Edit3 } from 'lucide-react';
 import FullScreenViewer from './FullScreenViewer';
 import { SceneCard, SkeletonSceneCard } from './SceneCard';
+// @ts-ignore
+import { VariableSizeList as List } from 'react-window';
+// @ts-ignore
+import AutoSizer from 'react-virtualized-auto-sizer';
 
 // Store & Hooks
 import { useStoryStore } from '../store/useStoryStore';
@@ -49,6 +53,17 @@ const Storyboard: React.FC<StoryboardProps> = ({ onExport }) => {
   const [showHistoryDropdown, setShowHistoryDropdown] = useState(false);
   const [showFullScreen, setShowFullScreen] = useState(false);
 
+  // Refs for virtualization
+  const listRef = useRef<any>(null);
+
+  // Recalculate list layout when story changes (e.g. extension)
+  useEffect(() => {
+    if (listRef.current) {
+      listRef.current.resetAfterIndex(0);
+    }
+  }, [story?.scenes.length, isExtendingStory, plotOptions.length]);
+
+
   if (!story) return null;
 
   const toggleSelectAll = () => {
@@ -76,17 +91,22 @@ const Storyboard: React.FC<StoryboardProps> = ({ onExport }) => {
   };
 
   const scrollToScene = (id: number) => {
-    const element = document.getElementById(`scene-${id}`);
-    if (element) {
-      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    if (story.mode === 'comic') {
+        const element = document.getElementById(`scene-${id}`);
+        if (element) {
+            element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    } else {
+        // For virtualized list, use the ref to scroll
+        const index = story.scenes.findIndex(s => s.id === id);
+        if (index !== -1 && listRef.current) {
+            listRef.current.scrollToItem(index, 'center');
+        }
     }
   };
 
   const handleUpdateSceneText = async (sceneId: number, narrative: string, visualPrompt: string, shouldRegenerate: boolean) => {
-      // 1. Update text locally in store
       updateScene(sceneId, { narrative, visual_prompt: visualPrompt });
-      
-      // 2. If regen requested, trigger retry image logic which uses the new text from store
       if (shouldRegenerate) {
           handleRetryImage(sceneId);
       }
@@ -99,6 +119,23 @@ const Storyboard: React.FC<StoryboardProps> = ({ onExport }) => {
   const isComicMode = story.mode === 'comic';
   const canUndo = historyIndex > 0;
   const canRedo = historyIndex < history.length - 1;
+
+  // Helper for Comic Grid Layout logic
+  const getComicSpanClass = (index: number) => {
+     // A repeated pattern for visual variety in comic grid
+     // Based on 12-column grid
+     const pattern = index % 5;
+     
+     if (index === 0) return 'col-span-12 md:row-span-2 min-h-[400px]'; // Hero Panel
+     
+     switch (pattern) {
+        case 1: return 'col-span-6 md:col-span-7 min-h-[300px]'; // Wide
+        case 2: return 'col-span-6 md:col-span-5 min-h-[300px]'; // Narrow
+        case 3: return 'col-span-6 md:col-span-4 min-h-[300px]'; // Small
+        case 4: return 'col-span-6 md:col-span-8 min-h-[300px]'; // Wide
+        default: return 'col-span-12 md:col-span-6 min-h-[300px]'; // Half
+     }
+  };
 
   // Reusable component for Story Extension UI (Continue/Options)
   const renderStoryExtensionControls = () => (
@@ -138,6 +175,41 @@ const Storyboard: React.FC<StoryboardProps> = ({ onExport }) => {
       )}
     </div>
   );
+
+  // Virtualized List Row Renderer
+  const VirtualRow = ({ index, style, data }: any) => {
+    const { scenes } = data;
+    
+    // Render footer at the end
+    if (index === scenes.length) {
+       return (
+          <div style={style}>
+             {renderStoryExtensionControls()}
+          </div>
+       );
+    }
+
+    const scene = scenes[index];
+    return (
+       <div style={style} className="px-4">
+           <div className="max-w-7xl mx-auto pb-12 h-full">
+              <SceneCard 
+                scene={scene} 
+                index={index}
+                mode="storyboard"
+                isSelected={selectedScenes.includes(scene.id)}
+                onToggleSelect={() => toggleSelectScene(scene.id)}
+                onRetry={() => handleRetryImage(scene.id)}
+                onModify={(feedback) => handleModifyImage(scene.id, feedback)}
+                onUpdate={(narrative, visual, regen) => handleUpdateSceneText(scene.id, narrative, visual, regen)}
+                onUpdateTags={(tags) => handleUpdateTags(scene.id, tags)}
+                onGenerateAudio={() => handleGenerateAudio(scene.id, scene.narrative)}
+                onGenerateVideo={() => handleGenerateVideo(scene.id)}
+              />
+           </div>
+       </div>
+    );
+  };
 
   return (
     <div className="flex flex-col h-full animate-in fade-in duration-700 relative">
@@ -232,11 +304,13 @@ const Storyboard: React.FC<StoryboardProps> = ({ onExport }) => {
       {/* VIEW MODE: COMIC PAGE VS STORYBOARD LIST */}
       {isComicMode ? (
         <div className="flex-1 overflow-y-auto custom-scrollbar px-4 pb-32">
-           {/* COMIC SHEET CONTAINER - Reduced max-width for better scaling on screen */}
-           <div className="max-w-4xl mx-auto bg-[#fdfbf7] p-4 md:p-8 shadow-[0_0_80px_rgba(0,0,0,0.5)] border border-slate-300 relative mt-4">
+           {/* COMIC SHEET CONTAINER */}
+           <div className="max-w-4xl mx-auto bg-[#fdfbf7] p-2 md:p-8 shadow-[0_20px_60px_rgba(0,0,0,0.5)] border border-slate-300 relative mt-4">
+               {/* Paper Texture Overlay */}
                <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-10 pointer-events-none mix-blend-multiply"></div>
                
-               <div className="relative z-10 mb-8 border-b-4 border-black pb-6 text-center">
+               {/* Header Area */}
+               <div className="relative z-10 mb-8 pb-6 text-center border-b-4 border-black">
                   <h2 className="text-3xl md:text-5xl font-black uppercase tracking-tighter text-black mb-2">{story.title}</h2>
                   <div className="flex items-center justify-center gap-4 text-xs font-bold font-mono text-slate-600 uppercase tracking-widest">
                      <span>Issue #01</span>
@@ -247,9 +321,14 @@ const Storyboard: React.FC<StoryboardProps> = ({ onExport }) => {
                   </div>
                </div>
 
-               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 relative z-10 auto-rows-fr">
+               {/* Dynamic Grid Layout */}
+               <div className="grid grid-cols-12 gap-3 relative z-10 auto-rows-min">
                   {story.scenes.map((scene, index) => (
-                     <div key={scene.id} id={`scene-${scene.id}`} className="scroll-mt-32 h-full aspect-[4/3]">
+                     <div 
+                        key={scene.id} 
+                        id={`scene-${scene.id}`} 
+                        className={`scroll-mt-32 ${getComicSpanClass(index)}`}
+                     >
                        <SceneCard 
                          scene={scene} 
                          index={index}
@@ -272,36 +351,31 @@ const Storyboard: React.FC<StoryboardProps> = ({ onExport }) => {
                </div>
            </div>
            
-           {/* Enable Story Extension in Comic Mode too */}
+           {/* Story Extension */}
            <div className="max-w-4xl mx-auto">
              {renderStoryExtensionControls()}
            </div>
         </div>
       ) : (
-        /* STANDARD STORYBOARD LIST VIEW (Non-virtualized) */
-        <div className="flex-1 overflow-y-auto custom-scrollbar px-8 pb-0">
-          <div className="max-w-7xl mx-auto">
-             {story.scenes.map((scene, index) => (
-                 <div key={scene.id} id={`scene-${scene.id}`} className="pb-12">
-                   <SceneCard 
-                     scene={scene} 
-                     index={index}
-                     mode="storyboard"
-                     isSelected={selectedScenes.includes(scene.id)}
-                     onToggleSelect={() => toggleSelectScene(scene.id)}
-                     onRetry={() => handleRetryImage(scene.id)}
-                     onModify={(feedback) => handleModifyImage(scene.id, feedback)}
-                     onUpdate={(narrative, visual, regen) => handleUpdateSceneText(scene.id, narrative, visual, regen)}
-                     onUpdateTags={(tags) => handleUpdateTags(scene.id, tags)}
-                     onGenerateAudio={() => handleGenerateAudio(scene.id, scene.narrative)}
-                     onGenerateVideo={() => handleGenerateVideo(scene.id)}
-                   />
-                 </div>
-             ))}
-
-             {/* Footer Options Row */}
-             {renderStoryExtensionControls()}
-          </div>
+        /* VIRTUALIZED STORYBOARD LIST VIEW */
+        <div className="flex-1 overflow-hidden px-4 md:px-8">
+           <AutoSizer>
+             {({ height, width }: { height: number, width: number }) => (
+                <List
+                  ref={listRef}
+                  height={height}
+                  width={width}
+                  itemCount={story.scenes.length + 1} // +1 for Footer
+                  itemSize={(index: number) => index === story.scenes.length ? 500 : 700} // Dynamic height: Cards vs Footer
+                  itemData={{
+                     scenes: story.scenes,
+                     selectedScenes,
+                  }}
+                >
+                  {VirtualRow}
+                </List>
+             )}
+           </AutoSizer>
         </div>
       )}
       

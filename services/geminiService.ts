@@ -48,14 +48,6 @@ const buildMultiModalParts = (textPrompt: string, images: string[]): Part[] => {
   return parts;
 };
 
-// Simple UUID generator
-const generateUUID = () => {
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-        var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
-        return v.toString(16);
-    });
-};
-
 interface AnalyzedCharacter {
   name: string;
   description: string;
@@ -149,7 +141,7 @@ export const generateStoryScript = async (
       tags: [] 
     }));
 
-    parsed.id = generateUUID();
+    parsed.id = crypto.randomUUID();
     parsed.createdAt = Date.now();
     parsed.lastModified = Date.now();
     parsed.actionType = "初始故事生成";
