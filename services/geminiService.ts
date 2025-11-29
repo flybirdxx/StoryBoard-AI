@@ -1,4 +1,5 @@
-import { GoogleGenAI, GenerateContentResponse, Modality } from "@google/genai";
+
+import { GoogleGenAI, GenerateContentResponse, Modality, Part } from "@google/genai";
 import { Scene, StoryData, PlotOption, ArtStyle, GenerationMode, AspectRatio, VisualAnchor } from "../types";
 import * as Prompts from "./prompts";
 
@@ -20,19 +21,17 @@ async function callWithRetry<T>(fn: () => Promise<T>, retries = 3, delayMs = 100
     } catch (error: any) {
       console.warn(`Gemini API Attempt ${i + 1} failed:`, error);
       lastError = error;
-      // If error suggests blocking or invalid arg, don't retry, just throw
       if (error.toString().includes("Safety") || error.toString().includes("Blocked")) {
         throw error;
       }
-      // Wait before retrying (exponential backoff)
       await new Promise(resolve => setTimeout(resolve, delayMs * Math.pow(2, i)));
     }
   }
   throw lastError;
 }
 
-const buildMultiModalParts = (textPrompt: string, images: string[]) => {
-  const parts: any[] = [];
+const buildMultiModalParts = (textPrompt: string, images: string[]): Part[] => {
+  const parts: Part[] = [];
   images.forEach(img => {
     let mimeType = "image/png";
     let data = img;
@@ -48,6 +47,20 @@ const buildMultiModalParts = (textPrompt: string, images: string[]) => {
   parts.push({ text: textPrompt });
   return parts;
 };
+
+// Simple UUID generator
+const generateUUID = () => {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+    });
+};
+
+interface AnalyzedCharacter {
+  name: string;
+  description: string;
+  previewImageIndex: number;
+}
 
 /**
  * Step 1: Analyze uploaded images to extract distinct Visual Anchors.
@@ -75,8 +88,8 @@ export const analyzeCharacterVisuals = async (
     const text = response.text;
     if (!text) return [];
     
-    const parsed = JSON.parse(text) as any[];
-    return parsed.map((p: any, i: number) => ({
+    const parsed = JSON.parse(text) as AnalyzedCharacter[];
+    return parsed.map((p, i) => ({
       id: `anchor_${Date.now()}_${i}`,
       name: p.name,
       description: p.description,
@@ -90,7 +103,6 @@ export const analyzeCharacterVisuals = async (
 
 /**
  * Generates the story script using Gemini 3 Pro.
- * Now generates a World Anchor and decoupled visual prompts.
  */
 export const generateStoryScript = async (
   theme: string,
@@ -137,6 +149,8 @@ export const generateStoryScript = async (
       tags: [] 
     }));
 
+    parsed.id = generateUUID();
+    parsed.createdAt = Date.now();
     parsed.lastModified = Date.now();
     parsed.actionType = "初始故事生成";
     parsed.mode = mode;
@@ -273,7 +287,7 @@ export const extendStoryScript = async (
 };
 
 /**
- * Generates a single scene image using the "Refined Sandwich Prompt" method.
+ * Generates a single scene image.
  */
 export const generateSceneImage = async (
   visualPrompt: string,
@@ -293,26 +307,22 @@ export const generateSceneImage = async (
       ? `STYLE: Comic Book / Manga Panel. ${artStyle}. Bold outlines, flat colors, expressive shading.`
       : `STYLE: Cinematic Movie Still. ${artStyle}. 8K resolution, detailed textures, cinematic lighting.`;
 
-    // --- SMART IMAGE SELECTION ---
     let imagesToSend = characterImages;
     let imageReferenceText = "";
 
-    // If sceneAnchors are provided (meaning we know who is in the scene):
     if (sceneAnchors !== undefined) {
-       // Filter images to strictly match the anchors present
        const relevantIndices = [...new Set(sceneAnchors.map(a => a.previewImageIndex).filter(i => i !== undefined && i !== null && i >= 0))];
        
        if (relevantIndices.length > 0) {
-          // Map old indices to new sequential indices (1, 2, 3...) for the prompt
           const newImages: string[] = [];
           const anchorReferenceLines: string[] = [];
           const indexMapping = new Map<number, number>();
 
           relevantIndices.forEach((oldIndex) => {
-             // Validate index bounds
-             if (oldIndex >= 0 && oldIndex < characterImages.length) {
-                newImages.push(characterImages[oldIndex]);
-                indexMapping.set(oldIndex, newImages.length); // Store 1-based index
+             // Safe check for index bounds
+             if (oldIndex! >= 0 && oldIndex! < characterImages.length) {
+                newImages.push(characterImages[oldIndex!]);
+                indexMapping.set(oldIndex!, newImages.length); 
              }
           });
 
@@ -332,7 +342,6 @@ export const generateSceneImage = async (
        }
     }
 
-    // --- REFINED PROMPT INJECTION (SANDWICH METHOD V2) ---
     const anchorSection = sceneAnchors && sceneAnchors.length > 0 
        ? sceneAnchors.map(a => `   - **${a.name}**: ${a.description}`).join('\n') 
        : "   - No specific character focus. Use generic background characters fitting the style if needed.";
@@ -406,9 +415,12 @@ export const generateCharacterDesign = async (desc: string, sketch: string | nul
     const prompt = Prompts.buildCharacterDesignPrompt(style, desc);
     try {
         const inputs = sketch ? buildMultiModalParts(prompt, [sketch]) : [{ text: prompt }];
+        // Cast text-only input for TS if needed, but array of Part is safer
+        const parts: Part[] = sketch ? buildMultiModalParts(prompt, [sketch]) : [{ text: prompt }];
+
         const response = await callWithRetry<GenerateContentResponse>(() => ai.models.generateContent({
             model: "gemini-3-pro-image-preview",
-            contents: { parts: inputs },
+            contents: { parts },
             config: { 
               imageConfig: { aspectRatio: ratio, imageSize: "2K" },
               safetySettings: Prompts.SAFETY_SETTINGS
@@ -420,8 +432,6 @@ export const generateCharacterDesign = async (desc: string, sketch: string | nul
         throw new Error("No character");
     } catch (e) { throw e; }
 };
-
-// ... generateSpeech and generateSceneVideo remain mostly unchanged, just using getAIClient ...
 
 const createWavUrl = (pcmData: Uint8Array): string => {
   const PCM_SAMPLE_RATE = 24000;

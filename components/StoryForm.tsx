@@ -1,37 +1,16 @@
+
 import React, { useState, useRef, useEffect } from 'react';
-import { Upload, Sparkles, Image as ImageIcon, X, Palette, Plus, Users, PenTool, LayoutTemplate, Square, Monitor, Wand2, Loader2 } from 'lucide-react';
+import { Sparkles, X, Palette, Plus, Users, PenTool, LayoutTemplate, Square, Monitor, Wand2, Loader2 } from 'lucide-react';
 import { ArtStyle, GenerationMode, AspectRatio, Character } from '../types';
+import { ART_STYLE_OPTIONS, ASPECT_RATIOS } from '../constants';
 import CharacterWorkshop from './CharacterWorkshop';
 import { useStoryStore } from '../store/useStoryStore';
+import { toast } from 'sonner';
 
 interface StoryFormProps {
   onSubmit: (theme: string, images: string[], artStyle: ArtStyle, mode: GenerationMode, ratio: AspectRatio) => void;
   isGenerating: boolean;
 }
-
-export interface ArtStyleOption {
-  id: ArtStyle;
-  label: string;
-  desc: string;
-  fallbackGradient: string;
-}
-
-export const ART_STYLE_OPTIONS: ArtStyleOption[] = [
-  { id: '电影写实', label: '电影写实', desc: '好莱坞大片质感，真实光影', fallbackGradient: 'from-slate-900 to-slate-700' },
-  { id: '美式漫画', label: '美式漫画', desc: '粗犷线条，超级英雄风格', fallbackGradient: 'from-red-900 to-blue-900' },
-  { id: '日本动漫', label: '日本动漫', desc: '精致赛璐珞，日系二次元', fallbackGradient: 'from-pink-900 to-indigo-900' },
-  { id: '水彩画', label: '水彩画', desc: '柔和晕染，清新艺术感', fallbackGradient: 'from-emerald-900 to-teal-900' },
-  { id: '赛博朋克', label: '赛博朋克', desc: '霓虹夜景，高科技低生活', fallbackGradient: 'from-fuchsia-900 to-purple-900' },
-  { id: '蒸汽朋克', label: '蒸汽朋克', desc: '维多利亚机械复古美学', fallbackGradient: 'from-amber-900 to-orange-900' },
-  { id: '黑暗奇幻', label: '黑暗奇幻', desc: '阴郁哥特，史诗感氛围', fallbackGradient: 'from-gray-900 to-black' },
-  { id: '皮克斯3D风格', label: '皮克斯3D', desc: '可爱圆润，CGI动画质感', fallbackGradient: 'from-blue-600 to-cyan-500' },
-  { id: '极简线条', label: '极简线条', desc: '黑白线稿，高雅且抽象', fallbackGradient: 'from-gray-200 to-white' },
-  { id: '复古像素', label: '复古像素', desc: '8-bit 电子游戏怀旧风格', fallbackGradient: 'from-indigo-600 to-purple-600' },
-  { id: '印象派油画', label: '印象派油画', desc: '浓墨重彩，梵高式笔触', fallbackGradient: 'from-yellow-700 to-blue-800' },
-  { id: 'custom', label: '自定义风格', desc: '手动输入艺术风格提示词', fallbackGradient: 'from-slate-800 to-zinc-900' },
-];
-
-const ASPECT_RATIOS: AspectRatio[] = ['16:9', '9:16', '1:1', '4:3', '3:4'];
 
 const StoryForm: React.FC<StoryFormProps> = ({ onSubmit, isGenerating }) => {
   const { savedCharacters, addSavedCharacter } = useStoryStore();
@@ -56,8 +35,8 @@ const StoryForm: React.FC<StoryFormProps> = ({ onSubmit, isGenerating }) => {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 5 * 1024 * 1024) { alert("文件过大"); return; }
-      if (images.length >= 10) { alert("最多10张"); return; }
+      if (file.size > 5 * 1024 * 1024) { toast.error("文件过大 (限制 5MB)"); return; }
+      if (images.length >= 10) { toast.error("最多上传 10 张图片"); return; }
       const reader = new FileReader();
       reader.onloadend = () => setImages(prev => [...prev, reader.result as string]);
       reader.readAsDataURL(file);
@@ -68,8 +47,9 @@ const StoryForm: React.FC<StoryFormProps> = ({ onSubmit, isGenerating }) => {
   const removeImage = (index: number) => setImages(prev => prev.filter((_, i) => i !== index));
   const triggerFileSelect = () => fileInputRef.current?.click();
   const handleAddSavedCharacter = (char: Character) => {
-    if (images.length >= 10) { alert("最多10张"); return; }
+    if (images.length >= 10) { toast.error("最多 10 张图片"); return; }
     setImages(prev => [...prev, char.imageUrl]);
+    toast.success(`已添加角色: ${char.name}`);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -77,7 +57,7 @@ const StoryForm: React.FC<StoryFormProps> = ({ onSubmit, isGenerating }) => {
     let finalStyle = selectedStyle;
     if (selectedStyle === 'custom') {
         if (!customStyleInput.trim()) {
-           alert("请输入自定义风格描述");
+           toast.error("请输入自定义风格描述");
            return;
         }
         finalStyle = customStyleInput.trim();

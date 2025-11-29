@@ -1,5 +1,7 @@
+
 import { create } from 'zustand';
 import { StoryData, Scene, Character, VisualAnchor, PlotOption, ArtStyle, GenerationMode, AspectRatio } from '../types';
+import { storageService } from '../services/storageService';
 
 interface GlobalSettings {
   theme: string;
@@ -24,6 +26,10 @@ interface StoryState {
   detectedAnchors: VisualAnchor[];
 
   // Actions
+  createNewStory: () => void;
+  loadStory: (id: string) => Promise<boolean>;
+  saveCurrentStory: () => Promise<void>;
+
   setStory: (story: StoryData | null, actionDescription?: string) => void;
   updateScene: (sceneId: number, updates: Partial<Scene>, pushToHistory?: boolean) => void;
   setSettings: (settings: Partial<GlobalSettings>) => void;
@@ -55,6 +61,46 @@ export const useStoryStore = create<StoryState>((set, get) => ({
     aspectRatio: '16:9'
   },
 
+  createNewStory: () => {
+    set({
+        story: null,
+        history: [],
+        historyIndex: -1,
+        plotOptions: [],
+        detectedAnchors: [],
+        settings: {
+            theme: '',
+            originalImages: [],
+            artStyle: '电影写实',
+            mode: 'storyboard',
+            aspectRatio: '16:9'
+        }
+    });
+  },
+
+  loadStory: async (id: string) => {
+    const data = await storageService.loadStory(id);
+    if (data) {
+        set({
+            story: data.story,
+            settings: data.settings,
+            savedCharacters: data.savedCharacters,
+            detectedAnchors: data.story.visualAnchors || [],
+            history: [{ ...data.story, actionType: "项目加载" }],
+            historyIndex: 0
+        });
+        return true;
+    }
+    return false;
+  },
+
+  saveCurrentStory: async () => {
+    const state = get();
+    if (state.story) {
+        await storageService.saveStory(state.story, state.settings, state.savedCharacters);
+    }
+  },
+
   setSettings: (newSettings) => set((state) => ({
     settings: { ...state.settings, ...newSettings }
   })),
@@ -71,12 +117,10 @@ export const useStoryStore = create<StoryState>((set, get) => ({
 
   setStory: (newStory, actionDescription) => {
     set((state) => {
-      // Just update data without history if no description (e.g. loading state)
       if (!actionDescription || !newStory) {
         return { story: newStory };
       }
 
-      // History logic
       const newHistory = state.history.slice(0, state.historyIndex + 1);
       const historyEntry = { 
         ...newStory, 
@@ -106,7 +150,6 @@ export const useStoryStore = create<StoryState>((set, get) => ({
         return { story: newStory };
       }
 
-      // Deduce action type from updates
       let actionType = "更新场景";
       if (updates.narrative) actionType = "更新文本";
       if (updates.tags) actionType = "更新标签";

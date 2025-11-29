@@ -3,14 +3,13 @@ import React, { useState, useRef, useEffect } from 'react';
 import { X, PenTool, Eraser, Download, Save, RotateCcw, Loader2, Monitor, Palette } from 'lucide-react';
 import { generateCharacterDesign } from '../services/geminiService';
 import { Character, AspectRatio, ArtStyle } from '../types';
-import { ART_STYLE_OPTIONS } from './StoryForm';
+import { ART_STYLE_OPTIONS, ASPECT_RATIOS } from '../constants';
+import { toast } from 'sonner';
 
 interface CharacterWorkshopProps {
   onClose: () => void;
   onSave: (character: Character) => void;
 }
-
-const ASPECT_RATIOS: AspectRatio[] = ['1:1', '3:4', '4:3', '9:16'];
 
 const CharacterWorkshop: React.FC<CharacterWorkshopProps> = ({ onClose, onSave }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -89,14 +88,14 @@ const CharacterWorkshop: React.FC<CharacterWorkshopProps> = ({ onClose, onSave }
 
   const handleGenerate = async () => {
     if (!name || !prompt) {
-      alert("请填写角色名称和描述");
+      toast.error("请填写角色名称和描述");
       return;
     }
 
     let styleToUse = artStyle;
     if (artStyle === 'custom') {
        if (!customStyle.trim()) {
-         alert("请输入自定义风格描述");
+         toast.error("请输入自定义风格描述");
          return;
        }
        styleToUse = customStyle.trim();
@@ -107,9 +106,10 @@ const CharacterWorkshop: React.FC<CharacterWorkshopProps> = ({ onClose, onSave }
       const sketchData = canvasRef.current?.toDataURL('image/jpeg', 0.8) || null;
       const imageUrl = await generateCharacterDesign(prompt, sketchData, styleToUse, aspectRatio);
       setGeneratedImage(imageUrl);
+      toast.success("生成成功");
     } catch (error) {
       console.error("Failed to generate character", error);
-      alert("生成失败，请重试");
+      toast.error("生成失败，请重试");
     } finally {
       setIsGenerating(false);
     }
@@ -123,6 +123,7 @@ const CharacterWorkshop: React.FC<CharacterWorkshopProps> = ({ onClose, onSave }
         description: prompt,
         imageUrl: generatedImage
       });
+      toast.success("角色已保存");
       onClose();
     }
   };

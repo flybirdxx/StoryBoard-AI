@@ -3,6 +3,7 @@ import { useStoryStore } from '../store/useStoryStore';
 import { generateStoryScript, analyzeCharacterVisuals, extendStoryScript, optimizeFullStory, generatePlotOptions } from '../services/geminiService';
 import { useImageGeneration } from './useImageGeneration';
 import { ArtStyle, GenerationMode, AspectRatio, VisualAnchor } from '../types';
+import { toast } from 'sonner';
 
 export const useStoryGeneration = () => {
   const { setSettings, setDetectedAnchors, setStory, setPlotOptions, story, settings, detectedAnchors } = useStoryStore();
@@ -40,7 +41,7 @@ export const useStoryGeneration = () => {
       onAnalysisComplete();
     } catch (error) {
       console.error("Analysis failed", error);
-      alert("角色分析失败，请重试。");
+      toast.error("角色分析失败，请重试");
     } finally {
       setIsAnalyzingAnchors(false);
       // Don't turn off isScriptLoading yet if we proceed to review
@@ -71,13 +72,14 @@ export const useStoryGeneration = () => {
       const storyWithMode = { ...storyData, mode: currentSettings.mode };
       setStory(storyWithMode, "故事生成"); // Pushes to history
       setIsScriptLoading(false);
+      toast.success("剧本已生成，正在绘制分镜...");
 
       // Trigger image generation
       await generateImagesForScenes(storyData.scenes, storyData.seed);
 
     } catch (error) {
       console.error("Story generation error:", error);
-      alert("生成故事时出错。");
+      toast.error("生成故事时出错");
       setIsScriptLoading(false);
     }
   }, [generateImagesForScenes]);
@@ -112,13 +114,14 @@ export const useStoryGeneration = () => {
       setStory(extendedStory, "续写故事");
 
       setIsExtendingStory(false);
+      toast.success("故事已续写，正在绘制新场景...");
 
       // Generate images for new scenes
       await generateImagesForScenes(newScenes, state.story.seed);
 
     } catch (error) {
       console.error("Extension failed", error);
-      alert("续写故事失败。");
+      toast.error("续写故事失败");
       setIsExtendingStory(false);
     }
   }, [generateImagesForScenes]);
@@ -135,9 +138,10 @@ export const useStoryGeneration = () => {
         scenes: optimizedScenes
       };
       setStory(newState, "优化全篇脚本");
+      toast.success("剧本优化完成");
     } catch (error) {
       console.error("Optimization failed", error);
-      alert("优化脚本失败，请重试。");
+      toast.error("优化脚本失败，请重试");
     } finally {
       setIsOptimizingStory(false);
     }
@@ -152,6 +156,7 @@ export const useStoryGeneration = () => {
       setPlotOptions(options);
     } catch (error) {
       console.error("Failed to get options", error);
+      toast.error("获取剧情选项失败");
     } finally {
       setIsLoadingOptions(false);
     }

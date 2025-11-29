@@ -3,6 +3,7 @@ import { useStoryStore } from '../store/useStoryStore';
 import { generateSceneImage } from '../services/geminiService';
 import { Scene, VisualAnchor } from '../types';
 import pLimit from 'p-limit';
+import { toast } from 'sonner';
 
 export const useImageGeneration = () => {
   const { story, settings, detectedAnchors, updateScene, setStory } = useStoryStore();
@@ -46,6 +47,7 @@ export const useImageGeneration = () => {
       } catch (error) {
         console.error(`Failed to generate image for scene ${scene.id}`, error);
         updateScene(scene.id, { isLoadingImage: false }, false);
+        toast.error(`场景 ${scene.id + 1} 图片生成失败`);
       }
     }));
 
@@ -75,9 +77,11 @@ export const useImageGeneration = () => {
         newSeed
       );
 
-      updateScene(sceneId, { isLoadingImage: false, imageUrl }, false); 
+      updateScene(sceneId, { isLoadingImage: false, imageUrl }, false);
+      toast.success(`场景 ${sceneId + 1} 重绘完成`);
     } catch (error) {
       updateScene(sceneId, { isLoadingImage: false }, false);
+      toast.error(`场景 ${sceneId + 1} 重绘失败`);
     }
   }, []);
 
@@ -105,10 +109,11 @@ export const useImageGeneration = () => {
 
       // This is a significant user action, push to history
       useStoryStore.getState().updateScene(sceneId, { isLoadingImage: false, imageUrl }, true);
+      toast.success(`场景 ${sceneId + 1} 修改完成`);
     } catch (error) {
       console.error("Modification failed", error);
       updateScene(sceneId, { isLoadingImage: false }, false);
-      alert("修改图片失败，请重试。");
+      toast.error("修改图片失败，请重试");
     }
   }, []);
 

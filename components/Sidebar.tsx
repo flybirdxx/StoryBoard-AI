@@ -1,7 +1,8 @@
-import React from 'react';
-import { Sparkles, Users, Clapperboard, LayoutGrid } from 'lucide-react';
 
-export type ViewType = 'create' | 'characters' | 'editor';
+import React from 'react';
+import { Sparkles, Users, Clapperboard, LayoutGrid, FolderOpen } from 'lucide-react';
+
+export type ViewType = 'create' | 'characters' | 'editor' | 'projects';
 
 interface SidebarProps {
   currentView: ViewType;
@@ -41,6 +42,20 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, hasActiveS
           <Sparkles className="w-5 h-5 flex-shrink-0" />
           <span className="hidden lg:block font-medium text-sm">创作中心</span>
           {currentView === 'create' && <div className="absolute right-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-white/20 rounded-l-full hidden lg:block"></div>}
+        </button>
+
+        <button
+          onClick={() => onChangeView('projects')}
+          className={`w-full flex items-center justify-center lg:justify-start gap-3 px-3 py-3.5 rounded-xl transition-all duration-200 group relative
+            ${currentView === 'projects' 
+              ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/25' 
+              : 'text-slate-400 hover:bg-white/5 hover:text-white'
+            }
+          `}
+          title="我的故事"
+        >
+          <FolderOpen className="w-5 h-5 flex-shrink-0" />
+          <span className="hidden lg:block font-medium text-sm">我的故事</span>
         </button>
 
         <button

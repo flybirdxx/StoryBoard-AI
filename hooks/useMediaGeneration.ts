@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 import { useStoryStore } from '../store/useStoryStore';
 import { generateSpeech, generateSceneVideo } from '../services/geminiService';
+import { toast } from 'sonner';
 
 export const useMediaGeneration = () => {
   const { updateScene, story } = useStoryStore();
@@ -11,9 +12,10 @@ export const useMediaGeneration = () => {
     try {
       const audioUrl = await generateSpeech(text);
       updateScene(sceneId, { isLoadingAudio: false, audioUrl }, false);
+      toast.success(`场景 ${sceneId + 1} 配音生成成功`);
     } catch (error) {
       console.error("Audio generation failed", error);
-      alert("生成语音失败。");
+      toast.error("生成语音失败");
       updateScene(sceneId, { isLoadingAudio: false }, false);
     }
   }, []);
@@ -24,6 +26,7 @@ export const useMediaGeneration = () => {
     if (!scene || !scene.imageUrl) return;
 
     updateScene(sceneId, { isLoadingVideo: true }, false);
+    toast.info("正在使用 Veo 生成视频，这可能需要几分钟...");
 
     try {
       const { url, cost } = await generateSceneVideo(scene.imageUrl, scene.visual_prompt);
@@ -32,9 +35,10 @@ export const useMediaGeneration = () => {
         videoUrl: url,
         videoCost: cost 
       }, false);
+      toast.success(`场景 ${sceneId + 1} 视频生成完成`);
     } catch (error) {
       console.error("Video generation failed", error);
-      alert("生成视频失败 (Veo)。请重试。");
+      toast.error("生成视频失败 (Veo)。请重试。");
       updateScene(sceneId, { isLoadingVideo: false }, false);
     }
   }, []);

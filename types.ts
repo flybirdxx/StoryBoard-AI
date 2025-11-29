@@ -22,8 +22,10 @@ export interface VisualAnchor {
 }
 
 export interface StoryData {
+  id: string; // UUID
   title: string;
   scenes: Scene[];
+  createdAt: number;
   lastModified?: number; // Timestamp for history
   actionType?: string;   // Description of the action (e.g., "Generated Story", "Modified Scene 2")
   mode: GenerationMode;  // Persist the mode for UI rendering logic
@@ -46,6 +48,13 @@ export interface Character {
 }
 
 export type ArtStyle = string;
+
+export interface ArtStyleOption {
+  id: ArtStyle;
+  label: string;
+  desc: string;
+  fallbackGradient: string;
+}
 
 export type GenerationMode = 'storyboard' | 'comic';
 
