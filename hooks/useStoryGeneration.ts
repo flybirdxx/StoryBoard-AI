@@ -134,7 +134,7 @@ export const useStoryGeneration = () => {
     if (!state.story || state.settings.originalImages.length === 0) return;
 
     setIsExtendingStory(true);
-    setPlotOptions([]);
+    setPlotOptions([]); // Clear options immediately so UI switches to loading state
 
     try {
       const lastId = state.story.scenes.length > 0 ? Math.max(...state.story.scenes.map(s => s.id)) + 1 : 0;
@@ -198,7 +198,11 @@ export const useStoryGeneration = () => {
     setIsLoadingOptions(true);
     try {
       const options = await generatePlotOptions(state.story.scenes, state.settings.theme);
-      setPlotOptions(options);
+      if (options && options.length > 0) {
+        setPlotOptions(options);
+      } else {
+        toast.error("未能生成有效的剧情选项，请重试");
+      }
     } catch (error) {
       console.error("Failed to get options", error);
       toast.error("获取剧情选项失败");

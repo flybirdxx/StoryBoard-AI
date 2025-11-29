@@ -394,6 +394,10 @@ const generateComicSheet = async (scenes: Scene[], title: string, hasBurntText: 
           ctx.fillText(String(scene.id + 1), x, y);
 
           // 5. Draw Speech Bubble
+          // CRITICAL FIX: Ensure we only draw this if it wasn't pre-burnt.
+          // In generateComicSheet, hasBurntText comes from config.withText.
+          // Since we skip pre-burning in exportScenes for this mode, 
+          // the image is clean and we MUST draw the bubble here.
           if (hasBurntText) {
              drawSpeechBubble(ctx, scene.narrative, x, y, PANEL_WIDTH, STANDARD_PANEL_HEIGHT);
           }
@@ -534,9 +538,15 @@ export const exportScenes = async (
   const validScenes = scenes.filter(s => s.imageUrl);
   if (validScenes.length === 0) return;
 
+  // Determine if we should burn text into individual images before composition
+  // For Comic Mode Long Image, the generator handles text rendering on the canvas directly,
+  // so we skip pre-burning to avoid double bubbles.
+  const skipPreBurn = config.format === 'long-image' && mode === 'comic';
+
   // Process images for PDF or Zip (Individual files)
   const processedScenes = await Promise.all(validScenes.map(async (scene) => {
-     if (config.withText && scene.imageUrl) {
+     // If config asks for text, AND we are NOT skipping due to comic layout logic
+     if (config.withText && scene.imageUrl && !skipPreBurn) {
         // This burns text into the image itself
         const newUrl = await compositeImageWithText(scene.imageUrl, scene.narrative, mode);
         return { ...scene, imageUrl: newUrl };
@@ -627,6 +637,8 @@ export const exportScenes = async (
   else if (config.format === 'long-image') {
     if (mode === 'comic') {
        // Switch to Comic Grid Layout (Paginated 2-col)
+       // We pass the ORIGINAL scenes (if skipPreBurn was true) so no double text.
+       // We pass config.withText (hasBurntText=true) so generateComicSheet draws the bubble.
        const blob = await generateComicSheet(processedScenes, storyTitle, config.withText);
        saveAs(blob, `${storyTitle.replace(/\s+/g, '_')}_ComicPage.png`);
     } else {

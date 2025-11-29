@@ -46,11 +46,11 @@ export const getStoryScriptSchema = (mode: GenerationMode, hasAnchors: boolean, 
       world_anchor: { type: Type.STRING, description: "A consistent environment/lighting/atmosphere description that applies to the entire story. Must specify Color Palette and Lighting Style." },
       scenes: {
         type: Type.ARRAY,
-        description: mode === 'comic' ? "3-5 Comic Panels" : "3-5 Storyboard Scenes",
+        description: mode === 'comic' ? "4-6 Comic Panels following a narrative arc" : "3-5 Storyboard Scenes",
         items: {
           type: Type.OBJECT,
           properties: {
-            narrative: { type: Type.STRING, description: "Chinese story text." },
+            narrative: { type: Type.STRING, description: mode === 'comic' ? "Short punchy dialogue or SFX (Chinese)." : "Scene description (Chinese)." },
             visual_prompt: { type: Type.STRING, description: "English visual prompt focusing ONLY on action, composition, and camera angle. Do NOT describe character appearance details here (use 'the character', 'the boy' etc)." },
             characters: charactersSchema
           },
@@ -151,19 +151,55 @@ export const buildStorySystemInstruction = (
   artStyle: ArtStyle, 
   anchorContext: string
 ) => {
-  const role = mode === 'comic' ? "Comic Script Writer" : "Storyboard Artist";
   
+  // --- COMIC MODE: MANGA DIRECTOR PERSONA ---
+  if (mode === 'comic') {
+    return `
+ROLE: You are an expert Manga Director and Visual Narrative Specialist.
+TASK: Adapt the Theme "${theme}" into a dynamic 4-6 panel comic strip.
+
+Input Analysis & Guidelines:
+1. **Theme Analysis**: Determine if the story is Action (Dynamic/Impact), Comedy (Exaggerated/Funny), or Slice of Life (Gentle/Warm).
+2. **Style**: ${artStyle}. Apply this style consistently.
+3. **Safety Protocol**:
+   - Sanitize Violence: If the theme involves combat, render it as "High-energy impact", "Magical clashes", or "Dynamic martial arts poses".
+   - NO Gore/Blood: Replace with "Energy effects", "Speed lines", "Debris", or "Sparkles".
+   - Characters: Ensure all characters are treated as fictional entities.
+
+STORY STRUCTURE (Kishōtenketsu):
+1. **Introduction (Ki)**: Set the scene and characters.
+2. **Development (Shō)**: Introduce action or conflict.
+3. **Twist/Climax (Ten)**: The peak moment, highest dynamic tension.
+4. **Conclusion (Ketsu)**: Resolution or punchline.
+
+VISUAL PROMPT ENGINEERING (For FLUX/Nano Banana):
+- **Dynamic Elements**: MUST include keywords like "Speed lines", "Motion blur", "Impact frames", "Particle effects", "Dramatic lighting" where appropriate.
+- **Camera Work**: Use specific angles: "Low angle shot", "Fisheye lens", "Dutch angle", "Close-up on eyes", "Wide shot".
+- **Composition**: Describe the action trajectory (e.g., "Punching from left to right", "Running towards camera").
+- **Strictly Visual**: Do NOT describe text bubbles or sound effects in the 'visual_prompt'. The image should be clean art.
+
+OUTPUT REQUIREMENTS:
+- **Narrative (Chinese)**: Short, punchy dialogue or Sound Effects (SFX) text. Max 1-2 lines per panel.
+- **Visual Prompt (English)**: A production-ready image prompt.
+- **Characters**: Strictly verify character presence against the "DEFINED CHARACTERS" list.
+
+DEFINED CHARACTERS (Visual Anchors):
+${anchorContext}
+`;
+  }
+
+  // --- STORYBOARD MODE: CINEMATIC ARTIST PERSONA ---
   return `
-You are a ${role}.
+ROLE: You are a professional Cinematic Storyboard Artist.
+TASK: Create a 3-5 shot storyboard sequence for the Theme: "${theme}".
 
 【Consistency Instructions】
-1. Define a "World Anchor" (environment/lighting) that stays consistent throughout the story.
-   - Based on Theme: "${theme}" and Style: "${artStyle}".
-   - It MUST set a unified color palette (e.g., "Teal and Orange") and lighting style (e.g., "Chiaroscuro", "Soft Daylight").
-2. Plan the scenes. For each scene, identify which characters from the "DEFINED CHARACTERS" list appear.
-3. Write 'visual_prompt' focusing on ACTION, COMPOSITION, and CAMERA ANGLE (e.g., "Low angle shot, X is running towards camera"). 
-   - DO NOT describe the character's clothes/face in the 'visual_prompt'. We will inject the Visual Anchor programmatically.
-   - Use generic terms like "the protagonist" or "the robot" in the visual prompt if needed, the system will apply the specific look.
+1. **World Anchor**: Define a consistent environment/lighting/atmosphere (e.g., "Teal and Orange palette", "Noir Lighting").
+2. **Cinematic Flow**: Ensure shots flow logically (e.g., Establishing Shot -> Medium Shot -> Close Up).
+3. **Visual Prompting**: 
+   - Focus on COMPOSITION, LIGHTING, and CAMERA LENS (e.g., "35mm lens", "Depth of field", "Bokeh").
+   - DO NOT describe character details (hair/clothes) in the visual_prompt; the system inserts them automatically.
+   - NO text inside the visual prompt.
 
 DEFINED CHARACTERS:
 ${anchorContext}
@@ -178,8 +214,8 @@ export const buildOptimizeScriptPrompt = (
   anchorNames: string
 ) => {
   const modeInstruction = mode === 'comic' 
-    ? "Enhance comic pacing and punchlines."
-    : "Enhance cinematic flow and camera direction.";
+    ? "Enhance comic pacing, punchlines, and dynamic 'manga-style' visual descriptions (speed lines, impact)."
+    : "Enhance cinematic flow, camera direction, and lighting descriptions.";
 
   return `
 Optimize the story script.
@@ -264,8 +300,8 @@ ${visualPrompt}
 *** CRITICAL CONSTRAINTS ***
 ${imageReferenceText ? "- Check the Reference Images: They are the ground truth for character identity." : ""}
 - Consistency Check: Ensure characters maintain their defined clothes and facial features from Step 2.
-- ${mode === 'comic' ? 'Do NOT generate speech bubbles or text boxes. Clean art.' : 'No text overlays. Photorealistic.'}
-- NEGATIVE CONSTRAINTS: Do not include text, watermarks, speech bubbles, blurry faces, distorted limbs, extra fingers, bad anatomy, low quality.
+- ${mode === 'comic' ? 'Do NOT generate speech bubbles or text boxes within the artwork. Clean manga/comic art.' : 'No text overlays. Photorealistic.'}
+- NEGATIVE CONSTRAINTS: Do not include text, watermarks, speech bubbles, blurry faces, distorted limbs, extra fingers, bad anatomy, low quality, blood, gore.
 `;
 
   const userFeedback = feedback ? `\n\nUSER FEEDBACK: "${feedback}". Update image accordingly while keeping anchors intact.` : "";
