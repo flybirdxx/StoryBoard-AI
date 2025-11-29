@@ -2,13 +2,10 @@ import React, { useState } from 'react';
 import { Plus, Paintbrush, MoreHorizontal, User, Users } from 'lucide-react';
 import { Character } from '../types';
 import CharacterWorkshop from './CharacterWorkshop';
+import { useStoryStore } from '../store/useStoryStore';
 
-interface CharacterLibraryProps {
-  characters: Character[];
-  onSaveCharacter: (char: Character) => void;
-}
-
-const CharacterLibrary: React.FC<CharacterLibraryProps> = ({ characters, onSaveCharacter }) => {
+const CharacterLibrary: React.FC = () => {
+  const { savedCharacters, addSavedCharacter } = useStoryStore();
   const [showWorkshop, setShowWorkshop] = useState(false);
 
   return (
@@ -40,7 +37,7 @@ const CharacterLibrary: React.FC<CharacterLibraryProps> = ({ characters, onSaveC
         </button>
 
         {/* Character Cards */}
-        {characters.map((char) => (
+        {savedCharacters.map((char) => (
           <div key={char.id} className="group relative aspect-[3/4] rounded-2xl bg-[#13161f] border border-white/10 overflow-hidden shadow-xl hover:shadow-2xl transition-all hover:-translate-y-1">
             <div className="absolute inset-0">
                {char.imageUrl ? (
@@ -65,7 +62,7 @@ const CharacterLibrary: React.FC<CharacterLibraryProps> = ({ characters, onSaveC
         ))}
       </div>
 
-      {characters.length === 0 && (
+      {savedCharacters.length === 0 && (
         <div className="mt-20 text-center">
            <div className="w-24 h-24 bg-slate-800/50 rounded-full mx-auto flex items-center justify-center mb-6">
               <Users className="w-10 h-10 text-slate-600" />
@@ -77,7 +74,7 @@ const CharacterLibrary: React.FC<CharacterLibraryProps> = ({ characters, onSaveC
       {showWorkshop && (
         <CharacterWorkshop 
           onClose={() => setShowWorkshop(false)}
-          onSave={onSaveCharacter}
+          onSave={addSavedCharacter}
         />
       )}
     </div>

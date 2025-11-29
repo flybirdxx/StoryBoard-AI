@@ -1,15 +1,12 @@
-
 import React, { useState, useRef, useEffect } from 'react';
-import { Upload, Sparkles, Image as ImageIcon, X, Palette, Plus, Users, PenTool, LayoutTemplate, Square, Monitor, Wand2, Paintbrush, ChevronDown, Check, Loader2, AlertCircle } from 'lucide-react';
+import { Upload, Sparkles, Image as ImageIcon, X, Palette, Plus, Users, PenTool, LayoutTemplate, Square, Monitor, Wand2, Loader2 } from 'lucide-react';
 import { ArtStyle, GenerationMode, AspectRatio, Character } from '../types';
 import CharacterWorkshop from './CharacterWorkshop';
-import { generateStylePreview } from '../services/geminiService';
+import { useStoryStore } from '../store/useStoryStore';
 
 interface StoryFormProps {
   onSubmit: (theme: string, images: string[], artStyle: ArtStyle, mode: GenerationMode, ratio: AspectRatio) => void;
   isGenerating: boolean;
-  savedCharacters: Character[];
-  onSaveCharacter: (char: Character) => void;
 }
 
 export interface ArtStyleOption {
@@ -36,14 +33,13 @@ export const ART_STYLE_OPTIONS: ArtStyleOption[] = [
 
 const ASPECT_RATIOS: AspectRatio[] = ['16:9', '9:16', '1:1', '4:3', '3:4'];
 
-const StoryForm: React.FC<StoryFormProps> = ({ onSubmit, isGenerating, savedCharacters, onSaveCharacter }) => {
+const StoryForm: React.FC<StoryFormProps> = ({ onSubmit, isGenerating }) => {
+  const { savedCharacters, addSavedCharacter } = useStoryStore();
   const [theme, setTheme] = useState('');
   const [images, setImages] = useState<string[]>([]);
   const [selectedStyle, setSelectedStyle] = useState<ArtStyle>('电影写实');
   const [customStyleInput, setCustomStyleInput] = useState('');
   const [showWorkshop, setShowWorkshop] = useState(false);
-  
-  // New State for Mode and Ratio
   const [mode, setMode] = useState<GenerationMode>('storyboard');
   const [aspectRatio, setAspectRatio] = useState<AspectRatio>('16:9');
 
@@ -71,7 +67,7 @@ const StoryForm: React.FC<StoryFormProps> = ({ onSubmit, isGenerating, savedChar
 
   const removeImage = (index: number) => setImages(prev => prev.filter((_, i) => i !== index));
   const triggerFileSelect = () => fileInputRef.current?.click();
-  const addSavedCharacter = (char: Character) => {
+  const handleAddSavedCharacter = (char: Character) => {
     if (images.length >= 10) { alert("最多10张"); return; }
     setImages(prev => [...prev, char.imageUrl]);
   };
@@ -100,7 +96,6 @@ const StoryForm: React.FC<StoryFormProps> = ({ onSubmit, isGenerating, savedChar
           
           {/* LEFT COLUMN: Configuration */}
           <div className="lg:col-span-5 space-y-6">
-             
              {/* Mode & Ratio Card */}
              <div className="bg-[#13161f] border border-white/5 rounded-2xl p-6 shadow-xl space-y-6">
                 <div className="flex items-center gap-2 mb-2">
@@ -136,14 +131,13 @@ const StoryForm: React.FC<StoryFormProps> = ({ onSubmit, isGenerating, savedChar
                 </div>
              </div>
 
-             {/* Style Card - Grid Layout Redesign */}
+             {/* Style Card */}
              <div className="bg-[#13161f] border border-white/5 rounded-2xl p-6 shadow-xl space-y-4">
                 <div className="flex items-center gap-2 mb-2">
                    <Palette className="w-4 h-4 text-purple-400" />
                    <h3 className="text-sm font-bold text-white uppercase tracking-wider">艺术风格</h3>
                 </div>
                 
-                {/* Style Grid */}
                 <div className="grid grid-cols-2 gap-2.5">
                    {ART_STYLE_OPTIONS.map((style) => (
                       <button
@@ -156,9 +150,7 @@ const StoryForm: React.FC<StoryFormProps> = ({ onSubmit, isGenerating, savedChar
                              : 'bg-black/20 border-white/5 hover:border-white/20 hover:bg-white/5'
                         }`}
                       >
-                         {/* Gradient Accent - Top Bar */}
                          <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${style.fallbackGradient} opacity-60 group-hover:opacity-100 transition-opacity`} />
-                         
                          <div className="mt-1">
                              <div className="flex items-center justify-between">
                                 <span className={`text-xs font-bold block mb-0.5 ${selectedStyle === style.id ? 'text-white' : 'text-slate-400 group-hover:text-slate-200'}`}>
@@ -176,7 +168,6 @@ const StoryForm: React.FC<StoryFormProps> = ({ onSubmit, isGenerating, savedChar
                    ))}
                 </div>
 
-                {/* Custom Style Input */}
                 {selectedStyle === 'custom' && (
                   <div className="animate-in fade-in slide-in-from-top-2 pt-2 bg-black/20 rounded-xl p-3 border border-white/5">
                      <label className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider mb-2 block flex items-center gap-2">
@@ -189,17 +180,14 @@ const StoryForm: React.FC<StoryFormProps> = ({ onSubmit, isGenerating, savedChar
                         placeholder="例如：梵高星空风格，厚涂油画，蓝色与黄色主调，笔触明显..."
                         className="w-full bg-black/40 border border-white/10 rounded-lg p-2.5 text-xs text-white placeholder-slate-600 focus:ring-1 focus:ring-indigo-500 outline-none resize-none shadow-inner"
                         rows={3}
-                        autoFocus
                      />
-                     <p className="text-[10px] text-slate-500 mt-2">* 越详细的描述，AI 越能准确捕捉您想要的艺术氛围。</p>
                   </div>
                 )}
              </div>
           </div>
 
-          {/* RIGHT COLUMN: Characters & Prompt */}
+          {/* RIGHT COLUMN */}
           <div className="lg:col-span-7 space-y-6">
-             
              {/* Character Selection */}
              <div className="bg-[#13161f] border border-white/5 rounded-2xl p-6 shadow-xl space-y-4">
                 <div className="flex items-center justify-between mb-2">
@@ -212,7 +200,6 @@ const StoryForm: React.FC<StoryFormProps> = ({ onSubmit, isGenerating, savedChar
                    </button>
                 </div>
                 
-                {/* Image Grid */}
                 <div className="grid grid-cols-4 sm:grid-cols-5 gap-3">
                    {images.map((img, idx) => (
                       <div key={idx} className="relative aspect-square rounded-xl overflow-hidden bg-black/40 border border-white/10 group hover:border-indigo-500/50 transition-all shadow-sm">
@@ -231,13 +218,12 @@ const StoryForm: React.FC<StoryFormProps> = ({ onSubmit, isGenerating, savedChar
                 </div>
                 <input type="file" ref={fileInputRef} onChange={handleFileChange} accept="image/*" className="hidden" />
                 
-                {/* Saved Characters Bar */}
                 {savedCharacters.length > 0 && (
                    <div className="pt-2 border-t border-white/5 mt-4">
                       <p className="text-[10px] text-slate-500 mb-2 font-bold uppercase">从库中选择</p>
                       <div className="flex gap-3 overflow-x-auto pb-2 custom-scrollbar">
                          {savedCharacters.map(char => (
-                            <button key={char.id} type="button" onClick={() => addSavedCharacter(char)} className="flex-shrink-0 w-12 h-12 rounded-full overflow-hidden border border-white/10 hover:border-indigo-500 transition-all relative group" title={char.name}>
+                            <button key={char.id} type="button" onClick={() => handleAddSavedCharacter(char)} className="flex-shrink-0 w-12 h-12 rounded-full overflow-hidden border border-white/10 hover:border-indigo-500 transition-all relative group" title={char.name}>
                                <img src={char.imageUrl} className="w-full h-full object-cover" />
                                <div className="absolute inset-0 bg-indigo-500/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"><Plus className="w-4 h-4 text-white" /></div>
                             </button>
@@ -278,7 +264,7 @@ const StoryForm: React.FC<StoryFormProps> = ({ onSubmit, isGenerating, savedChar
           </div>
        </form>
        
-       {showWorkshop && <CharacterWorkshop onClose={() => setShowWorkshop(false)} onSave={onSaveCharacter} />}
+       {showWorkshop && <CharacterWorkshop onClose={() => setShowWorkshop(false)} onSave={addSavedCharacter} />}
     </div>
   );
 };
