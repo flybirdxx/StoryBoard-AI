@@ -1,0 +1,125 @@
+/* Image Preview 组件样式 - 悬浮窗预览 */
+@import './variables.css';
+
+.image-preview-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(4px);
+  z-index: calc(var(--z-modal) + 10);
+  animation: fade-in 0.2s ease-out;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.image-preview-container {
+  position: fixed;
+  width: 400px;
+  max-width: 90vw;
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-2xl);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: pop-in 0.25s ease-out;
+  z-index: calc(var(--z-modal) + 11);
+}
+
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.9) translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.image-preview-header {
+  padding: var(--spacing-md) var(--spacing-lg);
+  border-bottom: 1px solid var(--color-border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--color-bg-tertiary);
+  flex-shrink: 0;
+}
+
+.image-preview-title {
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.image-preview-close {
+  padding: var(--spacing-xs);
+  background: transparent;
+  border: none;
+  color: var(--color-text-tertiary);
+  cursor: pointer;
+  border-radius: var(--radius-md);
+  transition: var(--transition-fast);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-left: var(--spacing-sm);
+}
+
+.image-preview-close:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-text-primary);
+}
+
+.image-preview-content {
+  padding: var(--spacing-lg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-bg-primary);
+  min-height: 300px;
+  max-height: 70vh;
+  overflow: hidden;
+}
+
+.image-preview-image {
+  width: 100%;
+  height: auto;
+  max-height: 70vh;
+  object-fit: contain;
+  border-radius: var(--radius-md);
+  display: block;
+}
+
+/* 响应式调整 */
+@media (max-width: 768px) {
+  .image-preview-container {
+    width: 90vw;
+    max-width: 400px;
+  }
+  
+  .image-preview-content {
+    min-height: 250px;
+    padding: var(--spacing-md);
+  }
+  
+  .image-preview-image {
+    max-height: 60vh;
+  }
+}
+

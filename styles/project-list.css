@@ -1,0 +1,371 @@
+/* ProjectList 组件样式 */
+@import './variables.css';
+
+.project-list-container {
+  padding: var(--spacing-2xl);
+  max-width: 80rem; /* max-w-7xl */
+  margin-left: auto;
+  margin-right: auto;
+  animation: fade-in 0.5s ease-out;
+}
+
+@media (min-width: 1280px) {
+  .project-list-container {
+    padding: 2.5rem var(--spacing-2xl);
+  }
+}
+
+.project-list-header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-2xl);
+}
+
+@media (min-width: 640px) {
+  .project-list-header {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+}
+
+.project-list-title {
+  font-size: var(--font-size-3xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+  margin-bottom: 0.25rem;
+}
+
+.project-list-subtitle {
+  color: var(--color-text-muted);
+  font-weight: var(--font-weight-normal);
+  margin-top: 0.25rem;
+}
+
+.project-list-create-button {
+  background: var(--color-indigo);
+  color: white;
+  font-weight: var(--font-weight-medium);
+  padding: 0.625rem 1.25rem;
+  border-radius: var(--radius-lg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  transition: all var(--transition-base);
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+}
+
+.project-list-create-button:hover {
+  background: var(--color-indigo-dark);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+.project-list-create-button svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+/* Loading State */
+.project-list-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--color-text-tertiary); /* text-slate-500 */
+}
+
+.project-list-loading svg {
+  width: var(--spacing-xl);
+  height: var(--spacing-xl);
+  animation: spin 1s linear infinite;
+  margin-bottom: var(--spacing-md);
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Empty State */
+.project-list-empty {
+  text-align: center;
+  padding: 5rem 0; /* py-20 */
+  background-color: var(--color-bg-secondary); /* bg-[#13161f] */
+  border-radius: var(--radius-2xl);
+  border: 1px dashed var(--color-border); /* border-dashed border-white/5 */
+}
+
+.project-list-empty svg {
+  width: 4rem; /* w-16 */
+  height: 4rem; /* h-16 */
+  color: var(--color-text-dark); /* text-slate-700 */
+  margin: 0 auto var(--spacing-md);
+}
+
+.project-list-empty-title {
+  color: var(--color-text-muted); /* text-slate-500 */
+  font-size: var(--font-size-lg);
+}
+
+.project-list-empty-subtitle {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-dark); /* text-slate-600 */
+  margin-top: var(--spacing-sm);
+}
+
+/* Project Grid */
+.project-list-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--spacing-xl);
+}
+
+@media (min-width: 640px) {
+  .project-list-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .project-list-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (min-width: 1280px) {
+  .project-list-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+/* Project Card */
+.project-card {
+  position: relative;
+  background-color: white;
+  border: 1px solid rgba(229, 231, 235, 1);
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  cursor: pointer;
+  transition: all 300ms ease;
+  display: flex;
+  flex-direction: column;
+}
+
+.dark .project-card,
+[data-theme="dark"] .project-card {
+  background-color: var(--color-bg-secondary);
+  border-color: rgba(55, 65, 81, 1);
+}
+
+.project-card:hover {
+  border-color: var(--color-indigo-light);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  transform: translateY(0);
+}
+
+/* Project Thumbnail */
+.project-card-thumbnail {
+  position: relative;
+  aspect-ratio: 16 / 10;
+  width: 100%;
+  overflow: hidden;
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+}
+
+.project-card-thumbnail img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 300ms ease;
+}
+
+.project-card:hover .project-card-thumbnail img {
+  transform: scale(1.05);
+}
+
+.project-card-thumbnail::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.5), transparent);
+}
+
+.project-card-thumbnail-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(243, 244, 246, 1);
+  color: var(--color-text-muted);
+}
+
+.dark .project-card-thumbnail-placeholder,
+[data-theme="dark"] .project-card-thumbnail-placeholder {
+  background: rgba(31, 41, 55, 1);
+}
+
+.project-card-thumbnail-placeholder svg {
+  width: 2.5rem;
+  height: 2.5rem;
+}
+
+.project-card-tag {
+  position: absolute;
+  bottom: 1rem;
+  left: 1rem;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  padding: 0.25rem 0.5rem;
+  border-radius: var(--radius-full);
+  backdrop-filter: blur(4px);
+}
+
+/* Project Info */
+.project-card-info {
+  padding: var(--spacing-md);
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.project-card-title {
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+  font-size: var(--font-size-lg);
+  flex-grow: 1;
+  margin-bottom: var(--spacing-md);
+}
+
+.project-card-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  margin-top: auto;
+}
+
+.project-card-meta-left {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.project-card-meta-left svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.project-card-more-button {
+  padding: 0.375rem;
+  border-radius: var(--radius-full);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--color-text-muted);
+  transition: all var(--transition-base);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.project-card-more-button:hover {
+  background: rgba(243, 244, 246, 1);
+  color: var(--color-text-primary);
+}
+
+.dark .project-card-more-button:hover,
+[data-theme="dark"] .project-card-more-button:hover {
+  background: rgba(31, 41, 55, 1);
+}
+
+.project-card-more-button svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+/* Create New Card */
+.project-card-create {
+  border: 2px dashed rgba(209, 213, 235, 1);
+  border-radius: var(--radius-xl);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: var(--spacing-md);
+  cursor: pointer;
+  transition: all 300ms ease;
+  background: transparent;
+}
+
+.dark .project-card-create,
+[data-theme="dark"] .project-card-create {
+  border-color: rgba(75, 85, 99, 1);
+}
+
+.project-card-create:hover {
+  border-color: var(--color-indigo);
+  background: rgba(99, 102, 241, 0.05);
+}
+
+.project-card-create-icon {
+  width: 3rem;
+  height: 3rem;
+  margin-bottom: var(--spacing-md);
+  background: rgba(229, 231, 235, 1);
+  border-radius: var(--radius-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 300ms ease;
+}
+
+.dark .project-card-create-icon,
+[data-theme="dark"] .project-card-create-icon {
+  background: rgba(31, 41, 55, 1);
+}
+
+.project-card-create:hover .project-card-create-icon {
+  background: rgba(99, 102, 241, 0.1);
+}
+
+.project-card-create-icon svg {
+  width: 1.5rem;
+  height: 1.5rem;
+  color: var(--color-text-muted);
+  transition: all 300ms ease;
+}
+
+.project-card-create:hover .project-card-create-icon svg {
+  color: var(--color-indigo);
+}
+
+.project-card-create-title {
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-secondary);
+  transition: all 300ms ease;
+}
+
+.project-card-create:hover .project-card-create-title {
+  color: var(--color-indigo-dark);
+}
+
+.project-card-create-subtitle {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  margin-top: 0.25rem;
+}
+

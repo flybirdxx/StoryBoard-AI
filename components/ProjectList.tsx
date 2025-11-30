@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { storageService } from '../services/storageService';
 import { useStoryStore } from '../store/useStoryStore';
-import { FolderOpen, Calendar, Trash2, ArrowRight, Loader2, Image as ImageIcon } from 'lucide-react';
+import { FolderOpen, Calendar, Trash2, ArrowRight, Loader2, Image as ImageIcon, Plus, MoreHorizontal } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface ProjectListProps {
@@ -46,80 +46,88 @@ const ProjectList: React.FC<ProjectListProps> = ({ onOpenProject }) => {
 
   if (isLoading) {
     return (
-      <div className="flex flex-col items-center justify-center h-full text-slate-500">
-        <Loader2 className="w-8 h-8 animate-spin mb-4" />
+      <div className="project-list-loading">
+        <Loader2 />
         <p>正在加载项目...</p>
       </div>
     );
   }
 
   return (
-    <div className="p-8 lg:p-12 max-w-7xl mx-auto animate-in fade-in duration-500">
-      <h2 className="text-3xl font-bold text-white mb-2">我的故事</h2>
-      <p className="text-slate-400 font-light mb-10">管理您已保存的创作项目。</p>
-
-      {projects.length === 0 ? (
-        <div className="text-center py-20 bg-[#13161f] rounded-2xl border border-white/5 border-dashed">
-           <FolderOpen className="w-16 h-16 text-slate-700 mx-auto mb-4" />
-           <p className="text-slate-500 text-lg">暂无已保存的故事</p>
-           <p className="text-sm text-slate-600 mt-2">前往创作中心开始您的第一个项目</p>
+    <div className="project-list-container">
+      <div className="project-list-header">
+        <div>
+          <h2 className="project-list-title">我的故事</h2>
+          <p className="project-list-subtitle">管理你已保存的创作项目。</p>
         </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        <button 
+          onClick={() => window.location.reload()}
+          className="project-list-create-button"
+        >
+          <Plus />
+          <span>创建新故事</span>
+        </button>
+        </div>
+
+      <div className="project-list-grid">
           {projects.map((project) => (
             <div 
               key={project.id} 
               onClick={() => handleOpen(project.id)}
-              className="group relative bg-[#13161f] border border-white/5 rounded-2xl overflow-hidden hover:border-indigo-500/50 hover:shadow-2xl hover:-translate-y-1 transition-all cursor-pointer"
+            className="project-card"
             >
               {/* Thumbnail */}
-              <div className="aspect-video bg-black/50 relative overflow-hidden">
+            <div className="project-card-thumbnail">
                 {project.thumbnail ? (
                   <img 
                     src={project.thumbnail} 
                     alt={project.title} 
-                    className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" 
                   />
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center text-slate-700">
-                    <ImageIcon className="w-10 h-10" />
+                <div className="project-card-thumbnail-placeholder">
+                  <ImageIcon />
                   </div>
                 )}
-                
-                {/* Overlay Action */}
-                <div className="absolute inset-0 bg-indigo-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                   <span className="bg-white/10 backdrop-blur-md px-4 py-2 rounded-full text-white text-xs font-bold flex items-center gap-2 border border-white/20">
-                     打开项目 <ArrowRight className="w-3 h-3" />
+              <span className="project-card-tag">
+                {project.mode === 'comic' ? '奇幻' : '科幻冒险'}
                    </span>
-                </div>
               </div>
 
               {/* Info */}
-              <div className="p-5">
-                <h3 className="font-bold text-white text-lg mb-1 truncate">{project.title || "未命名故事"}</h3>
-                <div className="flex items-center justify-between text-xs text-slate-500 mt-3">
-                  <div className="flex items-center gap-1.5">
-                    <Calendar className="w-3 h-3" />
-                    <span>{new Date(project.lastModified).toLocaleDateString()}</span>
+            <div className="project-card-info">
+              <h3 className="project-card-title">{project.title || "未命名故事"}</h3>
+              <div className="project-card-meta">
+                <span className="project-card-meta-left">
+                  <Calendar style={{ width: '1rem', height: '1rem' }} />
+                  <span>上次编辑：{new Date(project.lastModified).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })}</span>
+                </span>
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDelete(project.id, e);
+                  }}
+                  className="project-card-more-button"
+                  title="更多选项"
+                >
+                  <MoreHorizontal style={{ width: '1.25rem', height: '1.25rem' }} />
+                </button>
                   </div>
-                  <span className="uppercase tracking-wider opacity-60 bg-white/5 px-2 py-0.5 rounded text-[10px]">
-                    {project.mode === 'comic' ? 'Comic' : 'Storyboard'}
-                  </span>
                 </div>
               </div>
+        ))}
 
-              {/* Delete Button */}
+        {/* Create New Card */}
               <button 
-                onClick={(e) => handleDelete(project.id, e)}
-                className="absolute top-3 right-3 p-2 bg-black/60 hover:bg-red-500/80 text-white rounded-lg opacity-0 group-hover:opacity-100 transition-all z-20"
-                title="删除项目"
-              >
-                <Trash2 className="w-4 h-4" />
+          onClick={() => window.location.reload()}
+          className="project-card-create"
+        >
+          <div className="project-card-create-icon">
+            <Plus />
+          </div>
+          <h3 className="project-card-create-title">创建新故事</h3>
+          <p className="project-card-create-subtitle">开始你的下一个杰作</p>
               </button>
             </div>
-          ))}
-        </div>
-      )}
     </div>
   );
 };

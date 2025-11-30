@@ -1,0 +1,126 @@
+/* App 主布局样式 */
+@import './variables.css';
+
+.app-container {
+  display: flex;
+  height: 100vh;
+  background-color: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  font-family: var(--font-family-base);
+  overflow: hidden;
+}
+
+.app-main {
+  flex: 1;
+  overflow-y: auto;
+  position: relative;
+  background-color: var(--color-bg-primary);
+  width: 100%;
+  min-height: 100vh;
+  transition: background-color var(--transition-base);
+}
+
+.app-content {
+  position: relative;
+  z-index: 10;
+  width: 100%;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.loading-fallback {
+  display: flex;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
+}
+
+.loading-fallback-spinner {
+  width: 2rem;
+  height: 2rem;
+  color: var(--color-indigo);
+  animation: spin 1s linear infinite;
+}
+
+.empty-state {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-tertiary);
+}
+
+.empty-state-icon {
+  width: 2.5rem;
+  height: 2.5rem;
+  margin-bottom: var(--spacing-md);
+  opacity: 0.2;
+}
+
+.empty-state-text {
+  margin-bottom: var(--spacing-md);
+}
+
+.empty-state-actions {
+  display: flex;
+  gap: var(--spacing-md);
+  margin-top: var(--spacing-md);
+}
+
+.empty-state-link {
+  color: var(--color-indigo-light);
+  text-decoration: underline;
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  transition: color var(--transition-base);
+}
+
+.empty-state-link:hover {
+  color: var(--color-text-primary);
+}
+
+.global-loading {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.global-loading-spinner {
+  width: 3rem;
+  height: 3rem;
+  color: var(--color-indigo);
+  animation: spin 1s linear infinite;
+  margin-bottom: var(--spacing-md);
+}
+
+.global-loading-title {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+  margin-bottom: var(--spacing-sm);
+}
+
+.global-loading-description {
+  color: var(--color-text-tertiary);
+  margin-bottom: var(--spacing-xl);
+}
+
+.global-loading-cancel {
+  padding: var(--spacing-sm) var(--spacing-md);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: rgba(239, 68, 68, 1);
+  border-radius: var(--radius-lg);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  transition: all var(--transition-base);
+  background: transparent;
+}
+
+.global-loading-cancel:hover {
+  background: rgba(239, 68, 68, 0.1);
+}
+

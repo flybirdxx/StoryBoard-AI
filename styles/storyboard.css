@@ -1,0 +1,944 @@
+/* Storyboard 组件样式 */
+@import './variables.css';
+
+/* 工具类补充 */
+.space-y-6 > * + * {
+  margin-top: var(--spacing-lg);
+}
+
+.space-y-12 > * + * {
+  margin-top: 3rem;
+}
+
+.storyboard-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background-color: var(--color-bg-primary);
+  overflow: hidden;
+}
+
+/* 顶部工具栏 */
+.storyboard-header {
+  height: 4rem;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-bg-card);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--spacing-md);
+  z-index: 20;
+  flex-shrink: 0;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+  position: relative;
+}
+
+/* 添加微妙的顶部装饰条 */
+.storyboard-header::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, 
+    rgba(99, 102, 241, 0.6) 0%, 
+    rgba(168, 85, 247, 0.6) 50%, 
+    rgba(236, 72, 153, 0.6) 100%);
+  opacity: 0.8;
+}
+
+.dark .storyboard-header::before,
+[data-theme="dark"] .storyboard-header::before {
+  opacity: 1;
+}
+
+.dark .storyboard-header,
+[data-theme="dark"] .storyboard-header {
+  background-color: rgba(17, 24, 39, 0.8);
+  border-bottom-color: rgba(55, 65, 81, 1);
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.3), 0 1px 2px 0 rgba(0, 0, 0, 0.2);
+}
+
+.storyboard-header-left {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
+.storyboard-title {
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+  font-size: var(--font-size-lg);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 300px;
+}
+
+.storyboard-header-edit-button {
+  padding: 0.25rem;
+  border-radius: var(--radius-full);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--color-text-muted);
+  transition: all var(--transition-base);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.storyboard-header-edit-button:hover {
+  background: rgba(243, 244, 246, 1);
+  color: var(--color-text-primary);
+}
+
+.dark .storyboard-header-edit-button:hover,
+[data-theme="dark"] .storyboard-header-edit-button:hover {
+  background: rgba(55, 65, 81, 1);
+}
+
+.storyboard-header-edit-button svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.storyboard-header-more-button {
+  padding: 0.25rem;
+  border-radius: var(--radius-full);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--color-text-muted);
+  transition: all var(--transition-base);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.storyboard-header-more-button:hover {
+  background: rgba(243, 244, 246, 1);
+  color: var(--color-text-primary);
+}
+
+.dark .storyboard-header-more-button:hover,
+[data-theme="dark"] .storyboard-header-more-button:hover {
+  background: rgba(55, 65, 81, 1);
+}
+
+.storyboard-header-more-button svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.storyboard-divider {
+  height: 1.5rem;
+  width: 1px;
+  background: rgba(229, 231, 235, 1);
+}
+
+.dark .storyboard-divider,
+[data-theme="dark"] .storyboard-divider {
+  background: rgba(55, 65, 81, 1);
+}
+
+.storyboard-history-controls {
+  display: flex;
+  align-items: center;
+  background: rgba(0, 0, 0, 0.4);
+  border-radius: var(--radius-lg);
+  padding: 0.25rem;
+}
+
+.storyboard-history-button {
+  padding: 0.375rem;
+  border-radius: var(--radius-md);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all var(--transition-base);
+  color: var(--color-text-tertiary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.storyboard-history-button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--color-text-primary);
+}
+
+.storyboard-history-button:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.storyboard-history-button.active {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--color-text-primary);
+}
+
+.storyboard-history-button svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.storyboard-history-dropdown {
+  position: absolute;
+  top: 3.5rem;
+  left: 10rem;
+  width: 16rem;
+  background-color: #151921;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-2xl);
+  z-index: 50;
+  max-height: 20rem;
+  overflow-y: auto;
+}
+
+.storyboard-history-item {
+  width: 100%;
+  text-align: left;
+  padding: var(--spacing-md) var(--spacing-md);
+  font-size: var(--font-size-xs);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  background: transparent;
+  border-left: none;
+  border-right: none;
+  border-top: none;
+  cursor: pointer;
+  transition: all var(--transition-base);
+  color: var(--color-text-tertiary);
+}
+
+.storyboard-history-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.storyboard-history-item.active {
+  background: rgba(99, 102, 241, 0.1);
+  color: var(--color-indigo-light);
+}
+
+.storyboard-history-time {
+  opacity: 0.5;
+  margin-left: var(--spacing-sm);
+}
+
+.storyboard-header-right {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
+.storyboard-action-button {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.375rem 0.75rem;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  background: transparent;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all var(--transition-base);
+  border-radius: var(--radius-md);
+  font-weight: var(--font-weight-medium);
+}
+
+.storyboard-action-button:hover {
+  color: var(--color-indigo);
+  background: var(--color-bg-hover);
+  border-color: rgba(99, 102, 241, 0.2);
+}
+
+.storyboard-action-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.dark .storyboard-action-button:hover,
+[data-theme="dark"] .storyboard-action-button:hover {
+  color: var(--color-indigo-light);
+}
+
+.storyboard-action-button svg {
+  width: 1.125rem;
+  height: 1.125rem;
+}
+
+.storyboard-export-button {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: white;
+  background: var(--color-indigo);
+  border: none;
+  cursor: pointer;
+  transition: all var(--transition-base);
+  border-radius: var(--radius-lg);
+}
+
+.storyboard-export-button:hover {
+  background: rgba(99, 102, 241, 0.9);
+}
+
+.storyboard-export-button svg {
+  width: 1.125rem;
+  height: 1.125rem;
+}
+
+.storyboard-export-select {
+  padding: 0.5rem 1rem;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  border-radius: var(--radius-md);
+}
+
+.storyboard-export-select:hover {
+  color: var(--color-indigo);
+}
+
+.storyboard-export-toggle {
+  padding: 0.5rem;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--color-text-muted);
+  border-radius: var(--radius-md);
+  transition: all var(--transition-base);
+}
+
+.storyboard-export-toggle:hover {
+  background: rgba(243, 244, 246, 1);
+  color: var(--color-text-primary);
+}
+
+.storyboard-export-toggle.active {
+  background: rgba(99, 102, 241, 0.1);
+  color: var(--color-indigo);
+}
+
+.storyboard-export-toggle svg {
+  width: 1.125rem;
+  height: 1.125rem;
+}
+
+.storyboard-export-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* 工作区网格 */
+.storyboard-workspace {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+  background-color: rgba(249, 250, 251, 1);
+}
+
+.dark .storyboard-workspace,
+[data-theme="dark"] .storyboard-workspace {
+  background-color: rgba(17, 24, 39, 1);
+}
+
+/* 左侧场景导航 */
+.storyboard-scene-nav {
+  width: 16rem;
+  flex-shrink: 0;
+  border-right: 1px solid rgba(229, 231, 235, 1);
+  overflow-y: auto;
+  background-color: white;
+  display: flex;
+  flex-direction: column;
+}
+
+.dark .storyboard-scene-nav,
+[data-theme="dark"] .storyboard-scene-nav {
+  background-color: rgba(17, 24, 39, 0.8);
+  border-right-color: rgba(55, 65, 81, 1);
+  box-shadow: 2px 0 8px 0 rgba(0, 0, 0, 0.3);
+}
+
+.storyboard-scene-list {
+  padding: var(--spacing-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  flex: 1;
+}
+
+.storyboard-scene-actions {
+  padding: var(--spacing-md);
+  border-top: 1px solid rgba(229, 231, 235, 1);
+  background: white;
+  position: sticky;
+  bottom: 0;
+}
+
+.dark .storyboard-scene-actions,
+[data-theme="dark"] .storyboard-scene-actions {
+  background-color: rgba(17, 24, 39, 0.5);
+  border-top-color: rgba(55, 65, 81, 1);
+}
+
+.storyboard-extend-button {
+  width: 100%;
+  padding: var(--spacing-md) 0;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: var(--radius-xl);
+  color: var(--color-text-tertiary);
+  transition: all var(--transition-base);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  cursor: pointer;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.storyboard-extend-button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(99, 102, 241, 0.5);
+  color: var(--color-indigo-light);
+}
+
+.storyboard-extend-button:disabled {
+  cursor: not-allowed;
+}
+
+.storyboard-extend-button svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.storyboard-extend-button svg.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+.storyboard-extend-button svg.animate-scale {
+  transition: transform var(--transition-base);
+}
+
+.storyboard-extend-button:hover:not(:disabled) svg.animate-scale {
+  transform: scale(1.1);
+}
+
+/* 中间预览区域 */
+.storyboard-preview {
+  flex: 1;
+  background: var(--color-bg-primary);
+  overflow-y: auto;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: center;
+  padding: var(--spacing-2xl);
+  min-height: 0;
+}
+
+.dark .storyboard-preview,
+[data-theme="dark"] .storyboard-preview {
+  background: var(--color-bg-primary);
+}
+
+/* 剧情选项覆盖层 */
+.storyboard-plot-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(4px);
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-xl);
+  animation: fadeIn var(--transition-base);
+}
+
+.storyboard-plot-content {
+  max-width: 42rem;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+}
+
+.storyboard-plot-title {
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+  text-align: center;
+}
+
+.storyboard-plot-grid {
+  display: grid;
+  gap: var(--spacing-md);
+}
+
+.storyboard-plot-option {
+  text-align: left;
+  padding: var(--spacing-lg);
+  background: #1A1E29;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-xl);
+  transition: all var(--transition-base);
+  cursor: pointer;
+}
+
+.storyboard-plot-option:hover {
+  background: rgba(99, 102, 241, 0.3);
+  border-color: var(--color-indigo);
+}
+
+.storyboard-plot-option-title {
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+  margin-bottom: var(--spacing-sm);
+}
+
+.storyboard-plot-option:hover .storyboard-plot-option-title {
+  color: var(--color-indigo-light);
+}
+
+.storyboard-plot-option-desc {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-tertiary);
+}
+
+.storyboard-plot-cancel {
+  color: var(--color-text-muted);
+  text-decoration: underline;
+  font-size: var(--font-size-sm);
+  display: block;
+  margin: 0 auto;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: color var(--transition-base);
+}
+
+.storyboard-plot-cancel:hover {
+  color: var(--color-text-primary);
+}
+
+/* 续写分镜加载状态 - 应该覆盖整个预览区域并居中显示 */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.storyboard-plot-loading {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-xl);
+  animation: fadeIn var(--transition-base);
+}
+
+.storyboard-plot-loading-content {
+  padding: var(--spacing-2xl) var(--spacing-3xl);
+  text-align: center;
+  background: linear-gradient(135deg, 
+    rgba(17, 24, 39, 0.95) 0%, 
+    rgba(31, 41, 55, 0.95) 100%);
+  border-radius: var(--radius-2xl);
+  border: 1px solid rgba(99, 102, 241, 0.5);
+  box-shadow: 
+    0 8px 32px rgba(0, 0, 0, 0.6),
+    0 0 0 1px rgba(99, 102, 241, 0.2),
+    0 0 20px rgba(99, 102, 241, 0.1);
+  backdrop-filter: blur(12px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-md);
+  min-width: 280px;
+  position: relative;
+  overflow: hidden;
+}
+
+/* 添加微妙的内部光晕效果 */
+.storyboard-plot-loading-content::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    circle at center,
+    rgba(99, 102, 241, 0.15) 0%,
+    transparent 70%
+  );
+  pointer-events: none;
+  opacity: 0.6;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+[data-theme="light"] .storyboard-plot-loading,
+html:not(.dark) .storyboard-plot-loading {
+  background: rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="dark"] .storyboard-plot-loading,
+.dark .storyboard-plot-loading {
+  background: rgba(0, 0, 0, 0.7);
+}
+
+[data-theme="light"] .storyboard-plot-loading-content,
+html:not(.dark) .storyboard-plot-loading-content {
+  background: linear-gradient(135deg, 
+    rgba(255, 255, 255, 0.98) 0%, 
+    rgba(249, 250, 251, 0.98) 100%);
+  border-color: rgba(99, 102, 241, 0.3);
+  box-shadow: 
+    0 8px 32px rgba(0, 0, 0, 0.12),
+    0 0 0 1px rgba(99, 102, 241, 0.15),
+    0 0 20px rgba(99, 102, 241, 0.08);
+}
+
+[data-theme="dark"] .storyboard-plot-loading-content,
+.dark .storyboard-plot-loading-content {
+  background: linear-gradient(135deg, 
+    rgba(17, 24, 39, 0.95) 0%, 
+    rgba(31, 41, 55, 0.95) 100%);
+  border-color: rgba(99, 102, 241, 0.5);
+  box-shadow: 
+    0 8px 32px rgba(0, 0, 0, 0.6),
+    0 0 0 1px rgba(99, 102, 241, 0.2),
+    0 0 20px rgba(99, 102, 241, 0.1);
+}
+
+.storyboard-plot-loading-spinner {
+  width: 2rem;
+  height: 2rem;
+  color: var(--color-indigo-light);
+  animation: spin 1s linear infinite;
+  position: relative;
+  z-index: 1;
+  filter: drop-shadow(0 0 8px rgba(99, 102, 241, 0.5));
+}
+
+.storyboard-plot-loading-text {
+  color: var(--color-text-primary);
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--font-size-base);
+  position: relative;
+  z-index: 1;
+  letter-spacing: 0.02em;
+}
+
+[data-theme="light"] .storyboard-plot-loading-text,
+html:not(.dark) .storyboard-plot-loading-text {
+  color: var(--color-text-primary);
+}
+
+[data-theme="dark"] .storyboard-plot-loading-text,
+.dark .storyboard-plot-loading-text {
+  color: var(--color-text-primary);
+}
+
+/* 漫画模式样式 */
+.storyboard-comic-container {
+  padding: var(--spacing-xl);
+  padding-bottom: 8rem;
+  max-width: 64rem;
+  margin: 0 auto;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 3rem;
+}
+
+.storyboard-comic-page {
+  background: white;
+  padding: var(--spacing-lg);
+  box-shadow: var(--shadow-2xl);
+  position: relative;
+}
+
+@media (min-width: 768px) {
+  .storyboard-comic-page {
+    padding: var(--spacing-xl);
+  }
+}
+
+.storyboard-comic-header {
+  margin-bottom: var(--spacing-xl);
+  padding-bottom: var(--spacing-lg);
+  text-align: center;
+  border-bottom: 4px solid black;
+}
+
+.storyboard-comic-header-title {
+  font-size: 2.25rem;
+  font-weight: 900;
+  color: black;
+  text-transform: uppercase;
+  letter-spacing: -0.02em;
+  margin-bottom: var(--spacing-sm);
+}
+
+.storyboard-comic-header-meta {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  font-family: var(--font-family-mono);
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.storyboard-comic-grid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: var(--spacing-md);
+}
+
+.storyboard-comic-panel {
+  grid-column: span 12;
+  min-height: 400px;
+}
+
+@media (min-width: 768px) {
+  .storyboard-comic-panel.span-12 {
+    grid-column: span 12;
+    grid-row: span 2;
+    min-height: 400px;
+  }
+  
+  .storyboard-comic-panel.span-6 {
+    grid-column: span 6;
+    min-height: 300px;
+  }
+  
+  .storyboard-comic-panel.span-4 {
+    grid-column: span 4;
+    min-height: 250px;
+  }
+}
+
+.storyboard-comic-footer {
+  margin-top: var(--spacing-xl);
+  text-align: center;
+}
+
+.storyboard-comic-page-number {
+  font-size: var(--font-size-xs);
+  font-weight: 900;
+  background: black;
+  color: white;
+  padding: 0.25rem 0.5rem;
+  display: inline-block;
+}
+
+/* 漫画模式扩展区域 */
+.storyboard-comic-extend {
+  max-width: 64rem;
+  margin: 0 auto;
+  width: 100%;
+  padding-bottom: 5rem;
+}
+
+.storyboard-comic-extend-loading {
+  padding: var(--spacing-xl);
+  background: white;
+  border: 2px solid black;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-md);
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+.storyboard-comic-extend-loading-spinner {
+  width: 2rem;
+  height: 2rem;
+  color: black;
+  animation: spin 1s linear infinite;
+}
+
+.storyboard-comic-extend-loading-text {
+  color: black;
+  font-weight: var(--font-weight-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.storyboard-comic-extend-options {
+  background: white;
+  border: 4px solid black;
+  padding: var(--spacing-xl);
+  box-shadow: 8px 8px 0px rgba(0, 0, 0, 1);
+  animation: slideIn 0.4s ease;
+  color: black;
+}
+
+.storyboard-comic-extend-title {
+  font-size: var(--font-size-2xl);
+  font-weight: 900;
+  color: black;
+  text-transform: uppercase;
+  margin-bottom: var(--spacing-lg);
+  text-align: center;
+}
+
+.storyboard-comic-extend-subtitle {
+  text-align: center;
+  color: var(--color-text-muted);
+  margin-bottom: var(--spacing-lg);
+  font-weight: var(--font-weight-bold);
+}
+
+.storyboard-comic-extend-options-grid {
+  display: grid;
+  gap: var(--spacing-md);
+}
+
+.storyboard-comic-extend-option {
+  text-align: left;
+  padding: var(--spacing-lg);
+  border: 2px solid black;
+  background: white;
+  transition: all var(--transition-base);
+  cursor: pointer;
+}
+
+.storyboard-comic-extend-option:hover {
+  background: black;
+  color: white;
+}
+
+.storyboard-comic-extend-option-title {
+  font-weight: var(--font-weight-bold);
+  font-size: var(--font-size-lg);
+  display: block;
+  margin-bottom: 0.25rem;
+}
+
+.storyboard-comic-extend-option:hover .storyboard-comic-extend-option-title {
+  color: #fbbf24; /* yellow-400 */
+}
+
+.storyboard-comic-extend-option-desc {
+  font-size: var(--font-size-sm);
+  opacity: 0.8;
+}
+
+.storyboard-comic-extend-cancel {
+  margin-top: var(--spacing-lg);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  text-decoration: underline;
+  color: var(--color-text-muted);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  width: 100%;
+  text-align: center;
+  transition: color var(--transition-base);
+}
+
+.storyboard-comic-extend-cancel:hover {
+  color: black;
+}
+
+.storyboard-comic-extend-button {
+  width: 100%;
+  padding: 3rem 0;
+  border: 4px dashed rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-3xl);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-md);
+  cursor: pointer;
+  transition: all var(--transition-base);
+  background: transparent;
+}
+
+.storyboard-comic-extend-button:hover {
+  border-color: rgba(99, 102, 241, 0.5);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.storyboard-comic-extend-button-icon {
+  width: 4rem;
+  height: 4rem;
+  border-radius: var(--radius-full);
+  background: var(--color-indigo);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--shadow-lg);
+  transition: transform var(--transition-base);
+}
+
+.storyboard-comic-extend-button:hover .storyboard-comic-extend-button-icon {
+  transform: scale(1.1);
+}
+
+.storyboard-comic-extend-button-icon svg {
+  width: 2rem;
+  height: 2rem;
+  color: white;
+}
+
+.storyboard-comic-extend-button-icon svg.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+.storyboard-comic-extend-button-text {
+  color: var(--color-text-primary);
+  font-weight: var(--font-weight-bold);
+  font-size: var(--font-size-xl);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  transition: color var(--transition-base);
+}
+
+.storyboard-comic-extend-button:hover .storyboard-comic-extend-button-text {
+  color: var(--color-indigo-light);
+}
+
+/* 右侧检查面板容器 */
+.storyboard-inspector {
+  width: 20rem;
+  flex-shrink: 0;
+  border-left: 1px solid var(--color-border);
+  overflow-y: auto;
+  background-color: var(--color-bg-card);
+  height: 100%;
+  box-shadow: -2px 0 8px 0 rgba(0, 0, 0, 0.05);
+}
+
+.dark .storyboard-inspector,
+[data-theme="dark"] .storyboard-inspector {
+  background-color: rgba(17, 24, 39, 0.8);
+  border-left-color: rgba(55, 65, 81, 1);
+  box-shadow: -2px 0 8px 0 rgba(0, 0, 0, 0.3);
+}
+

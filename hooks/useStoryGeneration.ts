@@ -173,24 +173,77 @@ export const useStoryGeneration = () => {
 
   const handleOptimizeStory = useCallback(async () => {
     const state = useStoryStore.getState();
-    if (!state.story) return;
+    if (!state.story) {
+      toast.error("没有可优化的故事");
+      return;
+    }
+
+    // 确认操作
+    const confirmed = window.confirm(
+      "优化脚本将更新所有场景的文本描述（中文叙述和英文视觉提示），但不会重新生成图片。\n\n是否继续？"
+    );
+    if (!confirmed) return;
 
     setIsOptimizingStory(true);
+    let timeoutId: NodeJS.Timeout | null = null;
+
     try {
-      const optimizedScenes = await optimizeFullStory(state.story, state.settings.theme, state.settings.artStyle);
+      // 设置超时（60秒）
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        timeoutId = setTimeout(() => {
+          reject(new Error("优化超时，请检查网络连接后重试"));
+        }, 60000);
+      });
+
+      // 执行优化
+      const optimizePromise = optimizeFullStory(
+        state.story, 
+        state.settings.theme, 
+        state.settings.artStyle
+      );
+
+      const optimizedScenes = await Promise.race([optimizePromise, timeoutPromise]);
+
+      // 验证返回结果
+      if (!optimizedScenes || !Array.isArray(optimizedScenes) || optimizedScenes.length === 0) {
+        throw new Error("优化返回的数据格式不正确");
+      }
+
+      // 验证场景数量是否匹配
+      if (optimizedScenes.length !== state.story.scenes.length) {
+        console.warn(`场景数量不匹配: 原始 ${state.story.scenes.length}, 优化后 ${optimizedScenes.length}`);
+        toast.warning("优化后的场景数量与原始不匹配，已使用部分结果");
+      }
+
       const newState = {
         ...state.story,
         scenes: optimizedScenes
       };
       setStory(newState, "优化全篇脚本");
-      toast.success("剧本优化完成");
-    } catch (error) {
+      toast.success("剧本优化完成！文本已更新，如需更新图片请手动重新生成");
+    } catch (error: any) {
       console.error("Optimization failed", error);
-      toast.error("优化脚本失败，请重试");
+      
+      // 清除超时
+      if (timeoutId) clearTimeout(timeoutId);
+
+      // 根据错误类型显示不同的提示
+      if (error.name === 'AbortError') {
+        toast.info("优化已取消");
+      } else if (error.message?.includes("超时")) {
+        toast.error(error.message);
+      } else if (error.message?.includes("API Key")) {
+        toast.error("API 密钥未设置，请在设置中配置");
+      } else if (error.message?.includes("Safety") || error.message?.includes("Blocked")) {
+        toast.error("内容被安全过滤器阻止，请调整内容后重试");
+      } else {
+        toast.error(`优化脚本失败: ${error.message || "未知错误"}，请重试`);
+      }
     } finally {
+      if (timeoutId) clearTimeout(timeoutId);
       setIsOptimizingStory(false);
     }
-  }, []);
+  }, [setStory]);
 
   const handleGetOptions = useCallback(async () => {
     const state = useStoryStore.getState();

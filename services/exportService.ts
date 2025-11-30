@@ -2,7 +2,8 @@
 import { jsPDF } from "jspdf";
 import JSZip from "jszip";
 import saveAs from "file-saver";
-import { Scene, ExportConfig, GenerationMode } from "../types";
+import { Scene, ExportConfig, GenerationMode, ComicLayoutConfig, BubbleConfig, PanelAspectRatio } from "../types";
+import { getPresetConfig } from "../constants/comicLayoutPresets";
 
 /**
  * Helper to convert text to an image data URL to avoid font issues in PDF.
@@ -94,7 +95,43 @@ const wrapCanvasText = (ctx: CanvasRenderingContext2D, text: string, maxWidth: n
 };
 
 /**
- * Draws a comic speech bubble on the canvas
+ * Calculate bubble position based on config
+ */
+const calculateBubblePosition = (
+  position: string,
+  panelX: number,
+  panelY: number,
+  panelW: number,
+  panelH: number,
+  bubbleW: number,
+  bubbleH: number
+): { x: number; y: number } => {
+  const margin = 20;
+  
+  switch (position) {
+    case 'top-left':
+      return { x: panelX + margin, y: panelY + margin };
+    case 'top-right':
+      return { x: panelX + panelW - bubbleW - margin, y: panelY + margin };
+    case 'bottom-left':
+      return { x: panelX + margin, y: panelY + panelH - bubbleH - margin };
+    case 'bottom-right':
+      return { x: panelX + panelW - bubbleW - margin, y: panelY + panelH - bubbleH - margin };
+    case 'center':
+      return { x: panelX + (panelW - bubbleW) / 2, y: panelY + (panelH - bubbleH) / 2 };
+    case 'auto':
+    default:
+      // Auto: prefer top-left, but adjust if too large
+      if (bubbleH > panelH * 0.6) {
+        // If bubble is too tall, center it
+        return { x: panelX + (panelW - bubbleW) / 2, y: panelY + (panelH - bubbleH) / 2 };
+      }
+      return { x: panelX + margin, y: panelY + margin };
+  }
+};
+
+/**
+ * Draws a comic speech bubble on the canvas with enhanced styling
  */
 const drawSpeechBubble = (
   ctx: CanvasRenderingContext2D, 
@@ -102,64 +139,122 @@ const drawSpeechBubble = (
   panelX: number, 
   panelY: number, 
   panelW: number,
-  panelH: number
+  panelH: number,
+  config?: BubbleConfig
 ) => {
-  const fontSize = 28; // Large readable font
+  const bubbleConfig = config || {
+    style: 'modern',
+    position: 'auto',
+    color: '#ffffff',
+    textColor: '#000000',
+    borderWidth: 2,
+    borderColor: '#000000',
+    fontSize: 24,
+    padding: 16,
+    borderRadius: 16,
+    shadow: false,
+  };
+
+  const fontSize = bubbleConfig.fontSize;
   ctx.font = `bold ${fontSize}px "Microsoft YaHei", sans-serif`;
   
-  const bubblePadding = 20;
-  const maxBubbleWidth = panelW * 0.85; // Bubble takes up mostly full width
+  const bubblePadding = bubbleConfig.padding;
+  const maxBubbleWidth = panelW * 0.85;
   const lines = wrapCanvasText(ctx, text, maxBubbleWidth - (bubblePadding * 2));
   
-  const bubbleHeight = (lines.length * (fontSize * 1.4)) + (bubblePadding * 2);
-  const bubbleWidth = lines.reduce((max, line) => Math.max(max, ctx.measureText(line).width), 0) + (bubblePadding * 2);
+  const lineHeight = fontSize * 1.4;
+  const bubbleHeight = (lines.length * lineHeight) + (bubblePadding * 2);
+  const bubbleWidth = Math.min(
+    lines.reduce((max, line) => Math.max(max, ctx.measureText(line).width), 0) + (bubblePadding * 2),
+    maxBubbleWidth
+  );
   
-  // Position: Top Left with some margin
-  const bubbleX = panelX + 30;
-  const bubbleY = panelY + 30;
+  // Calculate position
+  const pos = calculateBubblePosition(
+    bubbleConfig.position,
+    panelX,
+    panelY,
+    panelW,
+    panelH,
+    bubbleWidth,
+    bubbleHeight
+  );
   
-  // Draw Bubble Shape (Rounded Rect)
-  const r = 15; // radius
-  ctx.beginPath();
-  ctx.moveTo(bubbleX + r, bubbleY);
-  ctx.lineTo(bubbleX + bubbleWidth - r, bubbleY);
-  ctx.quadraticCurveTo(bubbleX + bubbleWidth, bubbleY, bubbleX + bubbleWidth, bubbleY + r);
-  ctx.lineTo(bubbleX + bubbleWidth, bubbleY + bubbleHeight - r);
-  ctx.quadraticCurveTo(bubbleX + bubbleWidth, bubbleY + bubbleHeight, bubbleX + bubbleWidth - r, bubbleY + bubbleHeight);
-  // Tail start
-  ctx.lineTo(bubbleX + 40, bubbleY + bubbleHeight); 
-  ctx.lineTo(bubbleX + 20, bubbleY + bubbleHeight + 15); // Tail tip
-  ctx.lineTo(bubbleX + 30, bubbleY + bubbleHeight); // Tail end
-  // Continue rect
-  ctx.lineTo(bubbleX + r, bubbleY + bubbleHeight);
-  ctx.quadraticCurveTo(bubbleX, bubbleY + bubbleHeight, bubbleX, bubbleY + bubbleHeight - r);
-  ctx.lineTo(bubbleX, bubbleY + r);
-  ctx.quadraticCurveTo(bubbleX, bubbleY, bubbleX + r, bubbleY);
-  ctx.closePath();
+  const bubbleX = pos.x;
+  const bubbleY = pos.y;
+  const r = bubbleConfig.borderRadius;
   
-  // Shadow
+  // Draw shadow if enabled
+  if (bubbleConfig.shadow) {
   ctx.fillStyle = 'rgba(0,0,0,0.3)';
   ctx.save();
   ctx.translate(4, 4);
+    ctx.beginPath();
+    ctx.roundRect(bubbleX, bubbleY, bubbleWidth, bubbleHeight, r);
   ctx.fill();
   ctx.restore();
-
-  // Fill White
-  ctx.fillStyle = '#ffffff';
+  }
+  
+  // Helper function to draw rounded rectangle
+  const drawRoundedRect = (x: number, y: number, w: number, h: number, radius: number) => {
+    ctx.beginPath();
+    ctx.moveTo(x + radius, y);
+    ctx.lineTo(x + w - radius, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + radius);
+    ctx.lineTo(x + w, y + h - radius);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - radius, y + h);
+    ctx.lineTo(x + radius, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - radius);
+    ctx.lineTo(x, y + radius);
+    ctx.quadraticCurveTo(x, y, x + radius, y);
+    ctx.closePath();
+  };
+  
+  // Draw bubble shape based on style
+  ctx.beginPath();
+  
+  if (bubbleConfig.style === 'japanese' || bubbleConfig.style === 'modern') {
+    // Rounded rectangle (Japanese/Modern style)
+    drawRoundedRect(bubbleX, bubbleY, bubbleWidth, bubbleHeight, r);
+  } else if (bubbleConfig.style === 'american') {
+    // More angular corners (American style)
+    const cornerRadius = r * 0.5;
+    ctx.moveTo(bubbleX + cornerRadius, bubbleY);
+    ctx.lineTo(bubbleX + bubbleWidth - cornerRadius, bubbleY);
+    ctx.quadraticCurveTo(bubbleX + bubbleWidth, bubbleY, bubbleX + bubbleWidth, bubbleY + cornerRadius);
+    ctx.lineTo(bubbleX + bubbleWidth, bubbleY + bubbleHeight - cornerRadius);
+    ctx.quadraticCurveTo(bubbleX + bubbleWidth, bubbleY + bubbleHeight, bubbleX + bubbleWidth - cornerRadius, bubbleY + bubbleHeight);
+    // Tail for American style
+    ctx.lineTo(bubbleX + 40, bubbleY + bubbleHeight);
+    ctx.lineTo(bubbleX + 20, bubbleY + bubbleHeight + 15);
+    ctx.lineTo(bubbleX + 30, bubbleY + bubbleHeight);
+    ctx.lineTo(bubbleX + cornerRadius, bubbleY + bubbleHeight);
+    ctx.quadraticCurveTo(bubbleX, bubbleY + bubbleHeight, bubbleX, bubbleY + bubbleHeight - cornerRadius);
+    ctx.lineTo(bubbleX, bubbleY + cornerRadius);
+    ctx.quadraticCurveTo(bubbleX, bubbleY, bubbleX + cornerRadius, bubbleY);
+  } else {
+    // Custom: use rounded rect as default
+    drawRoundedRect(bubbleX, bubbleY, bubbleWidth, bubbleHeight, r);
+  }
+  
+  ctx.closePath();
+  
+  // Fill bubble
+  ctx.fillStyle = bubbleConfig.color;
   ctx.fill();
   
-  // Stroke Black
-  ctx.lineWidth = 3;
-  ctx.strokeStyle = '#000000';
+  // Stroke bubble
+  ctx.lineWidth = bubbleConfig.borderWidth;
+  ctx.strokeStyle = bubbleConfig.borderColor;
   ctx.stroke();
 
-  // Text
-  ctx.fillStyle = '#000000';
+  // Draw text
+  ctx.fillStyle = bubbleConfig.textColor;
   ctx.textBaseline = 'top';
   ctx.textAlign = 'left';
   
   lines.forEach((line, i) => {
-    ctx.fillText(line, bubbleX + bubblePadding, bubbleY + bubblePadding + (i * fontSize * 1.4));
+    ctx.fillText(line, bubbleX + bubblePadding, bubbleY + bubblePadding + (i * lineHeight));
   });
 };
 
@@ -228,9 +323,44 @@ const compositeImageWithText = async (base64: string, text: string, mode: Genera
 };
 
 /**
- * Generates a Comic Page Grid (Stitched Image) matching the UI 2-column layout
+ * Calculate panel dimensions based on aspect ratio
  */
-const generateComicSheet = async (scenes: Scene[], title: string, hasBurntText: boolean): Promise<Blob> => {
+const calculatePanelDimensions = (
+  width: number,
+  aspectRatio: PanelAspectRatio,
+  imageRatio?: number
+): number => {
+  switch (aspectRatio) {
+    case '1:1':
+      return width;
+    case '4:3':
+      return width * (3 / 4);
+    case '16:9':
+      return width * (9 / 16);
+    case '3:4':
+      return width * (4 / 3);
+    case '9:16':
+      return width * (16 / 9);
+    case 'auto':
+    default:
+      // Use image's native aspect ratio if available, otherwise default to 4:3
+      if (imageRatio) {
+        return width / imageRatio;
+      }
+      return width * 0.75; // Default 4:3
+  }
+};
+
+/**
+ * Generates a Comic Page Grid with configurable layout
+ */
+const generateComicSheet = async (
+  scenes: Scene[],
+  title: string,
+  hasBurntText: boolean,
+  layoutConfig?: ComicLayoutConfig,
+  bubbleConfig?: BubbleConfig
+): Promise<Blob> => {
   const loadedImages = await Promise.all(scenes.map(s => new Promise<{img: HTMLImageElement, scene: Scene}>((resolve) => {
     const img = new Image();
     img.crossOrigin = "anonymous";
@@ -241,27 +371,36 @@ const generateComicSheet = async (scenes: Scene[], title: string, hasBurntText: 
 
   if (loadedImages.length === 0) return new Blob();
 
+  // Use provided config or defaults
+  const config = layoutConfig || {
+    columns: 2,
+    panelAspectRatio: 'auto',
+    panelSpacing: 40,
+    pageMargin: { top: 120, bottom: 120, left: 120, right: 120 },
+    borderWidth: 3,
+    borderStyle: 'solid',
+    showPanelNumbers: false,
+  };
+
   // Configuration for A4-ish high res output
   const CANVAS_WIDTH = 2480; 
-  const MARGIN_X = 120;
-  const MARGIN_Y = 120;
+  const MARGIN_X = config.pageMargin.left;
+  const MARGIN_Y = config.pageMargin.top;
   const HEADER_HEIGHT = 400; // Title area height
   const PAGE_GAP = 100; // Gap between "pages"
-  const GAP = 40; // Gap between panels
-  const COLS = 2;
+  const GAP = config.panelSpacing;
+  const COLS = config.columns;
   const PANEL_WIDTH = (CANVAS_WIDTH - (MARGIN_X * 2) - (GAP * (COLS - 1))) / COLS;
   
-  // Calculate Standard Row Height (e.g. 3:4 aspect or 1:1)
-  // To keep it clean like the UI grid, let's assume a slightly tall rect or square.
-  // 16:9 images in a 2-col grid usually look best with their native ratio, 
-  // but to align rows, we should check max height.
-  // Let's use a fixed standard height for uniformity to match the "Grid" look.
-  const STANDARD_PANEL_HEIGHT = PANEL_WIDTH * 0.75; // 4:3 aspect ratio roughly
-
-  const SCENES_PER_PAGE = 6;
+  // Calculate scenes per page based on columns
+  const SCENES_PER_PAGE = COLS * 3; // 3 rows per page
   const totalPages = Math.ceil(loadedImages.length / SCENES_PER_PAGE);
 
-  // Calculate Total Canvas Height
+  // Calculate a default panel height for initial height calculation
+  // This will be refined when actually rendering panels
+  const DEFAULT_PANEL_HEIGHT = calculatePanelDimensions(PANEL_WIDTH, config.panelAspectRatio);
+
+  // Calculate Total Canvas Height (approximate, will be adjusted during rendering)
   let totalHeight = 0;
   
   for (let p = 0; p < totalPages; p++) {
@@ -270,9 +409,9 @@ const generateComicSheet = async (scenes: Scene[], title: string, hasBurntText: 
       
       const rowsInPage = Math.ceil(Math.min(SCENES_PER_PAGE, loadedImages.length - (p * SCENES_PER_PAGE)) / COLS);
       
-      pageHeight += rowsInPage * STANDARD_PANEL_HEIGHT;
+      pageHeight += rowsInPage * DEFAULT_PANEL_HEIGHT;
       pageHeight += (rowsInPage - 1) * GAP;
-      pageHeight += MARGIN_Y * 2; // Bottom margin + padding
+      pageHeight += config.pageMargin.bottom; // Bottom margin
       
       totalHeight += pageHeight;
       if (p < totalPages - 1) totalHeight += PAGE_GAP;
@@ -331,34 +470,64 @@ const generateComicSheet = async (scenes: Scene[], title: string, hasBurntText: 
       // Draw Grid for this Page
       const pageScenes = loadedImages.slice(p * SCENES_PER_PAGE, (p + 1) * SCENES_PER_PAGE);
       
+      // Calculate panel heights for this page (may vary if using auto aspect ratio)
+      const panelHeights: number[] = [];
+      let maxPanelHeight = 0;
+      
+      pageScenes.forEach((item, idx) => {
+        const { img } = item;
+        const imgRatio = img.width > 0 ? img.width / img.height : 1.33;
+        const panelHeight = calculatePanelDimensions(PANEL_WIDTH, config.panelAspectRatio, imgRatio);
+        panelHeights.push(panelHeight);
+        maxPanelHeight = Math.max(maxPanelHeight, panelHeight);
+      });
+      
+      // Use uniform height if aspect ratio is fixed, otherwise use calculated heights
+      const useUniformHeight = config.panelAspectRatio !== 'auto';
+      const STANDARD_PANEL_HEIGHT = useUniformHeight 
+        ? calculatePanelDimensions(PANEL_WIDTH, config.panelAspectRatio)
+        : maxPanelHeight;
+      
       pageScenes.forEach((item, idx) => {
           const col = idx % COLS;
           const row = Math.floor(idx / COLS);
           
           const x = MARGIN_X + (col * (PANEL_WIDTH + GAP));
-          const y = currentY + (row * (STANDARD_PANEL_HEIGHT + GAP));
+          const panelHeight = useUniformHeight ? STANDARD_PANEL_HEIGHT : panelHeights[idx];
+          
+          // Calculate Y position considering variable heights
+          let y = currentY;
+          for (let r = 0; r < row; r++) {
+            const rowIdx = r * COLS;
+            const rowHeight = useUniformHeight 
+              ? STANDARD_PANEL_HEIGHT 
+              : Math.max(...panelHeights.slice(rowIdx, rowIdx + COLS));
+            y += rowHeight + GAP;
+          }
           
           const { img, scene } = item;
 
-          // 1. Draw Shadow
-          const shadowOff = 15;
-          ctx.fillStyle = '#000000';
-          ctx.fillRect(x + shadowOff, y + shadowOff, PANEL_WIDTH, STANDARD_PANEL_HEIGHT);
+          // 1. Draw Shadow (optional, only if border style is solid)
+          if (config.borderStyle === 'solid') {
+            const shadowOff = 8;
+            ctx.fillStyle = 'rgba(0,0,0,0.2)';
+            ctx.fillRect(x + shadowOff, y + shadowOff, PANEL_WIDTH, panelHeight);
+          }
 
           // 2. Draw Image (Object Cover)
           ctx.save();
           ctx.beginPath();
-          ctx.rect(x, y, PANEL_WIDTH, STANDARD_PANEL_HEIGHT);
+          ctx.rect(x, y, PANEL_WIDTH, panelHeight);
           ctx.clip();
           
           if (img.width > 0) {
               // Calculate aspect ratio to fit "cover"
               const imgRatio = img.width / img.height;
-              const panelRatio = PANEL_WIDTH / STANDARD_PANEL_HEIGHT;
+              const panelRatio = PANEL_WIDTH / panelHeight;
               let renderW, renderH, offX, offY;
 
               if (imgRatio > panelRatio) {
-                  renderH = STANDARD_PANEL_HEIGHT;
+                  renderH = panelHeight;
                   renderW = renderH * imgRatio;
                   offY = 0;
                   offX = (PANEL_WIDTH - renderW) / 2;
@@ -366,21 +535,30 @@ const generateComicSheet = async (scenes: Scene[], title: string, hasBurntText: 
                   renderW = PANEL_WIDTH;
                   renderH = renderW / imgRatio;
                   offX = 0;
-                  offY = (STANDARD_PANEL_HEIGHT - renderH) / 2;
+                  offY = (panelHeight - renderH) / 2;
               }
               ctx.drawImage(img, x + offX, y + offY, renderW, renderH);
           } else {
               ctx.fillStyle = '#eeeeee';
-              ctx.fillRect(x, y, PANEL_WIDTH, STANDARD_PANEL_HEIGHT);
+              ctx.fillRect(x, y, PANEL_WIDTH, panelHeight);
           }
           ctx.restore();
 
           // 3. Draw Border
+          if (config.borderStyle !== 'none') {
           ctx.strokeStyle = '#000000';
-          ctx.lineWidth = 6;
-          ctx.strokeRect(x, y, PANEL_WIDTH, STANDARD_PANEL_HEIGHT);
+            ctx.lineWidth = config.borderWidth;
+            if (config.borderStyle === 'dashed') {
+              ctx.setLineDash([10, 5]);
+            } else {
+              ctx.setLineDash([]);
+            }
+            ctx.strokeRect(x, y, PANEL_WIDTH, panelHeight);
+            ctx.setLineDash([]); // Reset
+          }
 
-          // 4. Draw Number Badge
+          // 4. Draw Number Badge (if enabled)
+          if (config.showPanelNumbers) {
           const badgeSize = 50;
           ctx.fillStyle = '#000000';
           ctx.beginPath();
@@ -392,20 +570,26 @@ const generateComicSheet = async (scenes: Scene[], title: string, hasBurntText: 
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
           ctx.fillText(String(scene.id + 1), x, y);
+          }
 
           // 5. Draw Speech Bubble
-          // CRITICAL FIX: Ensure we only draw this if it wasn't pre-burnt.
-          // In generateComicSheet, hasBurntText comes from config.withText.
-          // Since we skip pre-burning in exportScenes for this mode, 
-          // the image is clean and we MUST draw the bubble here.
           if (hasBurntText) {
-             drawSpeechBubble(ctx, scene.narrative, x, y, PANEL_WIDTH, STANDARD_PANEL_HEIGHT);
+             drawSpeechBubble(ctx, scene.narrative, x, y, PANEL_WIDTH, panelHeight, bubbleConfig);
           }
       });
 
       // Advance Y for next page
       const rowsInThisPage = Math.ceil(pageScenes.length / COLS);
-      currentY += (rowsInThisPage * STANDARD_PANEL_HEIGHT) + ((rowsInThisPage - 1) * GAP) + MARGIN_Y;
+      let pageContentHeight = 0;
+      for (let r = 0; r < rowsInThisPage; r++) {
+        const rowStartIdx = r * COLS;
+        const rowHeight = useUniformHeight
+          ? STANDARD_PANEL_HEIGHT
+          : Math.max(...panelHeights.slice(rowStartIdx, Math.min(rowStartIdx + COLS, panelHeights.length)));
+        pageContentHeight += rowHeight;
+        if (r < rowsInThisPage - 1) pageContentHeight += GAP;
+      }
+      currentY += pageContentHeight + config.pageMargin.bottom;
 
       // Draw Page Footer
       ctx.fillStyle = '#000000';
@@ -636,10 +820,24 @@ export const exportScenes = async (
   }
   else if (config.format === 'long-image') {
     if (mode === 'comic') {
-       // Switch to Comic Grid Layout (Paginated 2-col)
-       // We pass the ORIGINAL scenes (if skipPreBurn was true) so no double text.
-       // We pass config.withText (hasBurntText=true) so generateComicSheet draws the bubble.
-       const blob = await generateComicSheet(processedScenes, storyTitle, config.withText);
+       // Switch to Comic Grid Layout with configurable options
+       // Apply preset if specified
+       let layoutConfig = config.comicLayout;
+       let bubbleConfig = config.bubbleConfig;
+       
+       if (config.preset && config.preset !== 'custom') {
+         const preset = getPresetConfig(config.preset);
+         layoutConfig = layoutConfig ? { ...preset.layout, ...layoutConfig } : preset.layout;
+         bubbleConfig = bubbleConfig ? { ...preset.bubble, ...bubbleConfig } : preset.bubble;
+       }
+       
+       const blob = await generateComicSheet(
+         processedScenes, 
+         storyTitle, 
+         config.withText,
+         layoutConfig,
+         bubbleConfig
+       );
        saveAs(blob, `${storyTitle.replace(/\s+/g, '_')}_ComicPage.png`);
     } else {
        // Default Long Strip

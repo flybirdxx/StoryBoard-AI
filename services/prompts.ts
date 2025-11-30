@@ -25,6 +25,27 @@ export const ANALYZE_CHARACTERS_SCHEMA: Schema = {
   }
 };
 
+export const EXTRACT_CHARACTERS_SCHEMA: Schema = {
+  type: Type.OBJECT,
+  properties: {
+    characters: {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          name: { type: Type.STRING, description: "角色名称" },
+          description: { type: Type.STRING, description: "角色在故事中的描述和作用" },
+          appearance: { type: Type.STRING, description: "详细的外观特征描述" },
+          personality: { type: Type.STRING, description: "性格特征（可选）" },
+          role: { type: Type.STRING, description: "角色定位（主角、配角、反派等）" }
+        },
+        required: ["name", "description", "appearance", "role"]
+      }
+    }
+  },
+  required: ["characters"]
+};
+
 export const getStoryScriptSchema = (mode: GenerationMode, hasAnchors: boolean, anchorNames: string): Schema => {
   // Handle case where no anchors exist to prevent Schema validation errors
   const charactersSchema = hasAnchors 
@@ -322,7 +343,77 @@ export const buildStylePreviewPrompt = (styleLabel: string, styleDesc: string) =
 export const buildCharacterDesignPrompt = (style: string, desc: string) => 
   `Character design sheet. Style: ${style}. Desc: ${desc}. Full body.`;
 
-export const buildPolishTextPrompt = (text: string, type: 'narrative' | 'visual') => 
-  type === 'narrative' 
-    ? `Optimize narrative (Chinese): "${text}"`
-    : `Optimize visual prompt (English). Keep visual anchors intact: "${text}"`;
+/**
+ * 从故事大纲中提取角色信息
+ */
+export const buildExtractCharactersPrompt = (outline: string, mode: GenerationMode) => {
+  const modeInstruction = mode === 'comic'
+    ? "重点关注角色的视觉特征和夸张表现"
+    : "重点关注角色的外观、服装和视觉形象";
+
+  return `你是一名专业的角色分析师。请从以下故事大纲中提取所有重要角色，并为每个角色生成详细的特征描述。
+
+**故事大纲：**
+${outline}
+
+**提取要求：**
+1. 识别故事中的所有重要角色（至少出现2次或对剧情有重要影响）
+2. 为每个角色提取以下信息：
+   - 角色名称（使用故事中的实际名称）
+   - 角色描述（在故事中的定位和作用，1-2句话）
+   - 外观特征（${modeInstruction}，包括：年龄、性别、体型、发型、服装、配饰、特殊标记等，100-200字）
+   - 性格特征（可选，如果故事中有体现）
+   - 角色定位（主角、配角、反派、背景角色等）
+
+3. 只提取确实在故事中出现的角色，不要虚构
+4. 如果故事中没有明确描述外观，基于角色定位和故事风格合理推断
+
+**输出格式（JSON）：**
+{
+  "characters": [
+    {
+      "name": "角色名称",
+      "description": "角色在故事中的描述",
+      "appearance": "详细的外观特征描述",
+      "personality": "性格特征（如果有）",
+      "role": "角色定位"
+    }
+  ]
+}
+
+请直接返回 JSON 格式，不要包含任何其他说明文字。`;
+};
+
+export const buildPolishTextPrompt = (text: string, type: 'narrative' | 'visual') => {
+  if (type === 'narrative') {
+    return `你是一名专业的编剧和文本优化专家。请优化以下单个场景的中文叙述文本。
+
+**重要要求：**
+1. 只优化这一个场景的叙述文本
+2. 不要生成多个场景或场次
+3. 不要添加场景编号、标题或其他格式
+4. 只返回优化后的文本内容，不要包含任何说明或解释
+5. 保持文本的原有风格和语境
+6. 提升文学性、画面感和动词的力度
+
+**原始文本：**
+${text}
+
+**请直接返回优化后的文本（仅文本内容，无其他格式）：`;
+  } else {
+    return `You are a professional visual description expert. Please optimize the following single scene's visual prompt.
+
+**Important Requirements:**
+1. Only optimize this ONE scene's visual prompt
+2. Do NOT generate multiple scenes or scenes
+3. Do NOT add scene numbers, titles, or other formatting
+4. Only return the optimized text content, no explanations or notes
+5. Keep visual anchors and character references intact
+6. Enhance visual details, camera angles, and lighting descriptions
+
+**Original Text:**
+${text}
+
+**Please return only the optimized text (text content only, no formatting):`;
+  }
+};

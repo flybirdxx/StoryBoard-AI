@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Key, ArrowRight, Save, X, Trash2 } from 'lucide-react';
+import { Key, ArrowRight, Save, X, Trash2, Video } from 'lucide-react';
 import { openApiKeySelector } from '../services/geminiService';
 
 interface ApiKeySelectorProps {
@@ -7,31 +7,54 @@ interface ApiKeySelectorProps {
   onClose?: () => void; // Optional: If provided, shows a close button
 }
 
+type KeyType = 'gemini' | 'veo';
+
 const ApiKeySelector: React.FC<ApiKeySelectorProps> = ({ onKeySelected, onClose }) => {
+  const [activeTab, setActiveTab] = useState<KeyType>('gemini');
   const [useManualInput, setUseManualInput] = useState(false);
   const [manualKey, setManualKey] = useState('');
   const [error, setError] = useState('');
   const [savedKeyMask, setSavedKeyMask] = useState('');
 
-  useEffect(() => {
-    // Check if AI Studio integration is available
-    const win = window as any;
-    if (!win.aistudio || !win.aistudio.openSelectKey) {
-      setUseManualInput(true);
-    }
+  const getStorageKey = (type: KeyType) => {
+    return type === 'gemini' ? 'gemini_api_key' : 'veo_api_key';
+  };
 
-    // Check if a manual key is already saved
-    const stored = localStorage.getItem("gemini_api_key");
+  const updateSavedKeyMask = (type: KeyType) => {
+    const stored = localStorage.getItem(getStorageKey(type));
     if (stored) {
       const mask = stored.substring(0, 4) + '...' + stored.substring(stored.length - 4);
       setSavedKeyMask(mask);
       setUseManualInput(true);
+    } else {
+      setSavedKeyMask('');
     }
-  }, []);
+  };
+
+  useEffect(() => {
+    // Check if AI Studio integration is available (only for Gemini)
+    const win = window as any;
+    if (activeTab === 'gemini' && (!win.aistudio || !win.aistudio.openSelectKey)) {
+      setUseManualInput(true);
+    } else if (activeTab === 'veo') {
+      setUseManualInput(true);
+    }
+
+    // Check if a manual key is already saved for current tab
+    updateSavedKeyMask(activeTab);
+    setManualKey('');
+    setError('');
+  }, [activeTab]);
 
   const handleSelectKey = async () => {
+    if (activeTab === 'veo') {
+      setUseManualInput(true);
+      return;
+    }
+    
     try {
       await openApiKeySelector();
+      updateSavedKeyMask('gemini');
       onKeySelected();
     } catch (error) {
       console.error("Failed to select key via studio", error);
@@ -48,65 +71,108 @@ const ApiKeySelector: React.FC<ApiKeySelectorProps> = ({ onKeySelected, onClose 
     }
     
     // Save to local storage for persistence in this browser
-    localStorage.setItem("gemini_api_key", manualKey.trim());
+    localStorage.setItem(getStorageKey(activeTab), manualKey.trim());
+    updateSavedKeyMask(activeTab);
+    setManualKey('');
     onKeySelected();
   };
 
   const handleClearKey = () => {
-    localStorage.removeItem("gemini_api_key");
+    localStorage.removeItem(getStorageKey(activeTab));
     setSavedKeyMask('');
     setManualKey('');
-    // If we can close, we might want to refresh state, but simple clear is UI update
+    setError('');
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/95 backdrop-blur-md p-4 animate-in fade-in duration-300">
-      <div className="bg-[#1A1E29] border border-white/10 rounded-2xl p-8 max-w-md w-full shadow-2xl text-center relative overflow-hidden">
+    <div className="api-key-selector-overlay">
+      <div className="api-key-selector-modal">
         {/* Decorative background */}
-        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-500"></div>
-        <div className="absolute inset-0 bg-indigo-500/5 pointer-events-none"></div>
+        <div className="api-key-selector-top-bar"></div>
+        <div className="api-key-selector-bg"></div>
 
         {/* Close Button */}
         {onClose && (
           <button 
             onClick={onClose}
-            className="absolute top-4 right-4 p-2 text-slate-500 hover:text-white transition-colors z-20"
+            className="api-key-selector-close"
           >
-            <X className="w-5 h-5" />
+            <X />
           </button>
         )}
 
-        <div className="relative z-10">
-          <div className="mx-auto bg-indigo-500/20 w-16 h-16 rounded-full flex items-center justify-center mb-6 ring-1 ring-indigo-500/50">
-            <Key className="w-8 h-8 text-indigo-400" />
+        <div className="api-key-selector-content">
+          <div className="api-key-selector-icon">
+            {activeTab === 'gemini' ? <Key /> : <Video />}
           </div>
           
-          <h2 className="text-2xl font-bold text-white mb-3">
+          <h2 className="api-key-selector-title">
             {savedKeyMask ? '配置 API Key' : '欢迎使用 StoryBoard AI'}
           </h2>
-          <p className="text-slate-400 mb-8 text-sm leading-relaxed">
+          
+          {/* Tab Selector */}
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+            <button
+              onClick={() => setActiveTab('gemini')}
+              style={{
+                flex: 1,
+                padding: '8px 16px',
+                background: activeTab === 'gemini' ? 'rgba(99, 102, 241, 0.2)' : 'transparent',
+                border: 'none',
+                borderBottom: activeTab === 'gemini' ? '2px solid rgb(99, 102, 241)' : '2px solid transparent',
+                color: activeTab === 'gemini' ? 'white' : 'rgba(255,255,255,0.6)',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                fontSize: '14px',
+                fontWeight: activeTab === 'gemini' ? '600' : '400'
+              }}
+            >
+              Gemini API
+            </button>
+            <button
+              onClick={() => setActiveTab('veo')}
+              style={{
+                flex: 1,
+                padding: '8px 16px',
+                background: activeTab === 'veo' ? 'rgba(99, 102, 241, 0.2)' : 'transparent',
+                border: 'none',
+                borderBottom: activeTab === 'veo' ? '2px solid rgb(99, 102, 241)' : '2px solid transparent',
+                color: activeTab === 'veo' ? 'white' : 'rgba(255,255,255,0.6)',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                fontSize: '14px',
+                fontWeight: activeTab === 'veo' ? '600' : '400'
+              }}
+            >
+              VEO API
+            </button>
+          </div>
+
+          <p className="api-key-selector-description">
             {savedKeyMask 
-              ? '您可以更新或清除已保存的 API Key。' 
-              : '为了开始创作，请输入您的 Google Gemini API Key。您的密钥仅存储在本地浏览器中。'}
+              ? `您可以更新或清除已保存的 ${activeTab === 'gemini' ? 'Gemini' : 'VEO'} API Key。` 
+              : activeTab === 'gemini'
+                ? '为了开始创作，请输入您的 Google Gemini API Key。您的密钥仅存储在本地浏览器中。'
+                : '为了生成视频，请输入您的第三方 VEO API Key（来自 ai.t8star.cn）。您的密钥仅存储在本地浏览器中。'}
           </p>
           
           {savedKeyMask ? (
-            <div className="mb-6 p-4 bg-green-500/10 border border-green-500/20 rounded-xl">
-              <p className="text-xs text-green-400 font-bold uppercase tracking-wider mb-1">当前正在使用自定义 Key</p>
-              <p className="text-white font-mono">{savedKeyMask}</p>
+            <div className="api-key-selector-saved">
+              <p className="api-key-selector-saved-label">当前正在使用自定义 Key</p>
+              <p className="api-key-selector-saved-key">{savedKeyMask}</p>
               <button 
                 onClick={handleClearKey}
-                className="mt-3 text-xs text-red-400 hover:text-red-300 flex items-center justify-center gap-1 mx-auto hover:underline"
+                className="api-key-selector-clear-button"
               >
-                <Trash2 className="w-3 h-3" /> 清除并重新输入
+                <Trash2 /> 清除并重新输入
               </button>
             </div>
           ) : null}
 
           {useManualInput ? (
-            <form onSubmit={handleManualSubmit} className="space-y-4">
-              <div className="text-left">
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">
+            <form onSubmit={handleManualSubmit} className="api-key-selector-form">
+              <div className="api-key-selector-field">
+                <label className="api-key-selector-field-label">
                   {savedKeyMask ? '更新 Key' : '输入新的 Key'}
                 </label>
                 <input
@@ -116,43 +182,47 @@ const ApiKeySelector: React.FC<ApiKeySelectorProps> = ({ onKeySelected, onClose 
                     setManualKey(e.target.value);
                     setError('');
                   }}
-                  placeholder="AIzaSy..."
-                  className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 transition-all font-mono text-sm"
+                  placeholder={activeTab === 'gemini' ? "AIzaSy..." : "输入VEO API Key"}
+                  className="api-key-selector-input"
                   autoFocus={!savedKeyMask}
                 />
-                {error && <p className="text-red-400 text-xs mt-2">{error}</p>}
+                {error && <p className="api-key-selector-error">{error}</p>}
               </div>
 
               <button
                 type="submit"
-                className="w-full py-3.5 px-6 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl transition-all shadow-lg shadow-indigo-500/20 flex items-center justify-center gap-2"
+                className="api-key-selector-submit-button"
               >
-                <Save className="w-4 h-4" />
+                <Save />
                 {savedKeyMask ? '更新设置' : '开始使用'}
               </button>
             </form>
           ) : (
-            <div className="space-y-4">
+            <div className="api-key-selector-alternatives">
               <button
                 onClick={handleSelectKey}
-                className="w-full py-3.5 px-6 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-semibold rounded-xl transition-all transform hover:scale-[1.02] shadow-lg shadow-indigo-500/25 flex items-center justify-center gap-2"
+                className="api-key-selector-studio-button"
               >
                 连接 Google AI Studio
-                <ArrowRight className="w-4 h-4" />
+                <ArrowRight />
               </button>
               
               <button 
                 onClick={() => setUseManualInput(true)}
-                className="text-xs text-slate-500 hover:text-slate-300 underline underline-offset-2"
+                className="api-key-selector-manual-link"
               >
                 或者手动输入 API Key
               </button>
             </div>
           )}
           
-          <div className="mt-8 pt-6 border-t border-white/5">
-             <p className="text-xs text-slate-500">
-                没有 Key? <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:text-indigo-300 hover:underline">在此处免费获取</a>
+          <div className="api-key-selector-footer">
+             <p className="api-key-selector-footer-text">
+                {activeTab === 'gemini' ? (
+                  <>没有 Key? <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="api-key-selector-footer-link">在此处免费获取</a></>
+                ) : (
+                  <>VEO API Key 需要从第三方服务商获取</>
+                )}
              </p>
           </div>
         </div>

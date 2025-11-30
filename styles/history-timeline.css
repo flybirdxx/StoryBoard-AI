@@ -1,0 +1,375 @@
+/* History Timeline Component Styles */
+
+.history-timeline-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  animation: fadeIn 0.2s ease-out;
+  padding: var(--spacing-lg);
+}
+
+[data-theme="light"] .history-timeline-overlay,
+html:not(.dark) .history-timeline-overlay {
+  background: rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="dark"] .history-timeline-overlay,
+.dark .history-timeline-overlay {
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.history-timeline-container {
+  background: var(--color-bg-secondary);
+  border-radius: var(--radius-2xl);
+  box-shadow: var(--shadow-2xl);
+  width: 100%;
+  max-width: 42rem;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: slideUp 0.3s ease-out;
+}
+
+[data-theme="light"] .history-timeline-container,
+html:not(.dark) .history-timeline-container {
+  background: #ffffff;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+[data-theme="dark"] .history-timeline-container,
+.dark .history-timeline-container {
+  background: var(--color-bg-secondary);
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(1rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.history-timeline-header {
+  padding: var(--spacing-lg);
+  border-bottom: 1px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--color-bg-tertiary);
+}
+
+[data-theme="light"] .history-timeline-header,
+html:not(.dark) .history-timeline-header {
+  background: #f8f9fa;
+}
+
+[data-theme="dark"] .history-timeline-header,
+.dark .history-timeline-header {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.history-timeline-title {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+.history-timeline-close {
+  width: 2rem;
+  height: 2rem;
+  border-radius: var(--radius-full);
+  border: none;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: var(--transition-fast);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.history-timeline-close:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-text-primary);
+}
+
+.history-timeline-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--spacing-lg);
+}
+
+.history-timeline-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-3xl);
+  color: var(--color-text-tertiary);
+  text-align: center;
+}
+
+.history-empty-icon {
+  width: 3rem;
+  height: 3rem;
+  margin-bottom: var(--spacing-md);
+  opacity: 0.3;
+}
+
+.history-timeline-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.history-timeline-item {
+  display: flex;
+  gap: var(--spacing-md);
+  padding: var(--spacing-md);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  transition: var(--transition-fast);
+  position: relative;
+}
+
+.history-timeline-item:hover {
+  background: var(--color-bg-hover);
+}
+
+[data-theme="light"] .history-timeline-item:hover,
+html:not(.dark) .history-timeline-item:hover {
+  background: rgba(0, 0, 0, 0.03);
+}
+
+[data-theme="dark"] .history-timeline-item:hover,
+.dark .history-timeline-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.history-timeline-item.active {
+  background: rgba(99, 102, 241, 0.1);
+  border-left: 3px solid var(--color-indigo);
+}
+
+[data-theme="light"] .history-timeline-item.active,
+html:not(.dark) .history-timeline-item.active {
+  background: rgba(99, 102, 241, 0.08);
+  border-left-color: var(--color-indigo);
+}
+
+[data-theme="dark"] .history-timeline-item.active,
+.dark .history-timeline-item.active {
+  background: rgba(99, 102, 241, 0.15);
+  border-left-color: var(--color-indigo-light);
+}
+
+.history-timeline-item.past {
+  opacity: 0.7;
+}
+
+.history-timeline-item.future {
+  opacity: 0.5;
+}
+
+.history-timeline-line {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.history-timeline-dot {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: var(--radius-full);
+  background: var(--color-bg-tertiary);
+  border: 2px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  z-index: 2;
+  transition: var(--transition-fast);
+}
+
+[data-theme="light"] .history-timeline-dot,
+html:not(.dark) .history-timeline-dot {
+  background: #ffffff;
+  border-color: rgba(0, 0, 0, 0.1);
+}
+
+[data-theme="dark"] .history-timeline-dot,
+.dark .history-timeline-dot {
+  background: rgba(17, 24, 39, 0.8);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.history-timeline-item.active .history-timeline-dot {
+  background: var(--color-indigo);
+  border-color: var(--color-indigo);
+  box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.2);
+}
+
+.history-timeline-item.past .history-timeline-dot {
+  background: var(--color-green);
+  border-color: var(--color-green);
+}
+
+.history-icon {
+  width: 1rem;
+  height: 1rem;
+  color: var(--color-text-secondary);
+}
+
+.history-timeline-item.active .history-icon {
+  color: white;
+}
+
+.history-timeline-item.past .history-icon {
+  color: white;
+}
+
+.history-timeline-connector {
+  width: 2px;
+  flex: 1;
+  background: var(--color-border);
+  margin: var(--spacing-xs) 0;
+  min-height: 2rem;
+}
+
+.history-timeline-item.active ~ .history-timeline-item .history-timeline-connector {
+  background: var(--color-border);
+}
+
+.history-timeline-content-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  min-width: 0;
+}
+
+.history-timeline-action {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+}
+
+.history-action-type {
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  font-size: var(--font-size-sm);
+}
+
+.history-scene-badge {
+  font-size: var(--font-size-xs);
+  padding: 0.125rem var(--spacing-sm);
+  border-radius: var(--radius-md);
+  background: rgba(99, 102, 241, 0.1);
+  color: var(--color-indigo);
+  font-weight: var(--font-weight-medium);
+}
+
+[data-theme="light"] .history-scene-badge,
+html:not(.dark) .history-scene-badge {
+  background: rgba(99, 102, 241, 0.1);
+  color: #4f46e5;
+}
+
+[data-theme="dark"] .history-scene-badge,
+.dark .history-scene-badge {
+  background: rgba(99, 102, 241, 0.2);
+  color: var(--color-indigo-light);
+}
+
+.history-description {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
+  margin: 0;
+}
+
+.history-fields {
+  display: flex;
+  gap: var(--spacing-xs);
+  flex-wrap: wrap;
+}
+
+.history-field-badge {
+  font-size: 10px;
+  padding: 0.125rem 0.375rem;
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border);
+}
+
+[data-theme="light"] .history-field-badge,
+html:not(.dark) .history-field-badge {
+  background: #f3f4f6;
+  border-color: rgba(0, 0, 0, 0.1);
+}
+
+[data-theme="dark"] .history-field-badge,
+.dark .history-field-badge {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.history-timeline-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-top: var(--spacing-xs);
+}
+
+.history-time-icon {
+  width: 0.75rem;
+  height: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+.history-time {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+}
+
+.history-timeline-footer {
+  padding: var(--spacing-md) var(--spacing-lg);
+  border-top: 1px solid var(--color-border);
+  background: var(--color-bg-tertiary);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+[data-theme="light"] .history-timeline-footer,
+html:not(.dark) .history-timeline-footer {
+  background: #f8f9fa;
+}
+
+[data-theme="dark"] .history-timeline-footer,
+.dark .history-timeline-footer {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.history-timeline-stats {
+  display: flex;
+  gap: var(--spacing-lg);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
+}
+

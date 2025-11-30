@@ -44,10 +44,19 @@ export const useImageGeneration = () => {
         );
 
         updateScene(scene.id, { isLoadingImage: false, imageUrl }, false); 
-      } catch (error) {
+      } catch (error: any) {
         console.error(`Failed to generate image for scene ${scene.id}`, error);
         updateScene(scene.id, { isLoadingImage: false }, false);
-        toast.error(`场景 ${scene.id + 1} 图片生成失败`);
+        
+        // Provide more specific error messages
+        const errorMessage = error?.message || '未知错误';
+        if (errorMessage.includes('安全过滤器') || errorMessage.includes('SAFETY')) {
+          toast.error(`场景 ${scene.id + 1} 生成失败：内容被安全过滤器阻止`);
+        } else if (errorMessage.includes('API') || errorMessage.includes('配置')) {
+          toast.error(`场景 ${scene.id + 1} 生成失败：${errorMessage}`);
+        } else {
+          toast.error(`场景 ${scene.id + 1} 图片生成失败：${errorMessage}`);
+        }
       }
     }));
 
@@ -79,9 +88,14 @@ export const useImageGeneration = () => {
 
       updateScene(sceneId, { isLoadingImage: false, imageUrl }, false);
       toast.success(`场景 ${sceneId + 1} 重绘完成`);
-    } catch (error) {
+    } catch (error: any) {
       updateScene(sceneId, { isLoadingImage: false }, false);
-      toast.error(`场景 ${sceneId + 1} 重绘失败`);
+      const errorMessage = error?.message || '未知错误';
+      if (errorMessage.includes('安全过滤器') || errorMessage.includes('SAFETY')) {
+        toast.error(`场景 ${sceneId + 1} 重绘失败：内容被安全过滤器阻止`);
+      } else {
+        toast.error(`场景 ${sceneId + 1} 重绘失败：${errorMessage}`);
+      }
     }
   }, []);
 
@@ -110,10 +124,17 @@ export const useImageGeneration = () => {
       // This is a significant user action, push to history
       useStoryStore.getState().updateScene(sceneId, { isLoadingImage: false, imageUrl }, true);
       toast.success(`场景 ${sceneId + 1} 修改完成`);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Modification failed", error);
       updateScene(sceneId, { isLoadingImage: false }, false);
-      toast.error("修改图片失败，请重试");
+      const errorMessage = error?.message || '未知错误';
+      if (errorMessage.includes('安全过滤器') || errorMessage.includes('SAFETY')) {
+        toast.error("修改失败：内容被安全过滤器阻止，请修改提示词");
+      } else if (errorMessage.includes('API') || errorMessage.includes('配置')) {
+        toast.error(`修改失败：${errorMessage}`);
+      } else {
+        toast.error(`修改图片失败：${errorMessage}`);
+      }
     }
   }, []);
 

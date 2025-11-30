@@ -1,0 +1,614 @@
+/* 现代化重设计的演员阵容和故事大纲模块样式 */
+@import './variables.css';
+
+/* ============================================
+   演员阵容模块 - 现代化设计
+   ============================================ */
+
+.cast-section-modern {
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-2xl);
+  padding: var(--spacing-xl);
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+  position: relative;
+  overflow: hidden;
+  transition: all var(--transition-base);
+}
+
+.cast-section-modern::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, 
+    rgba(236, 72, 153, 0.8) 0%, 
+    rgba(168, 85, 247, 0.8) 50%, 
+    rgba(99, 102, 241, 0.8) 100%);
+  border-radius: var(--radius-2xl) var(--radius-2xl) 0 0;
+}
+
+.cast-section-modern:hover {
+  box-shadow: var(--shadow-xl);
+  border-color: rgba(99, 102, 241, 0.3);
+}
+
+/* Header */
+.cast-section-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--spacing-md);
+}
+
+.cast-section-title-group {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-md);
+  flex: 1;
+}
+
+.cast-section-icon {
+  width: 2rem;
+  height: 2rem;
+  color: var(--color-pink);
+  flex-shrink: 0;
+  margin-top: 0.125rem;
+}
+
+.cast-section-title {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+  margin: 0;
+  line-height: 1.4;
+}
+
+.cast-section-subtitle {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  margin-top: var(--spacing-xs);
+  line-height: 1.5;
+}
+
+.cast-section-count {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  background: linear-gradient(135deg, 
+    rgba(236, 72, 153, 0.1) 0%, 
+    rgba(168, 85, 247, 0.1) 100%);
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--radius-full);
+  border: 1px solid rgba(236, 72, 153, 0.2);
+  font-weight: var(--font-weight-bold);
+  font-size: var(--font-size-sm);
+  flex-shrink: 0;
+}
+
+.cast-section-count-current {
+  color: var(--color-pink);
+  font-size: var(--font-size-base);
+}
+
+.cast-section-count-separator {
+  color: var(--color-text-muted);
+  opacity: 0.5;
+}
+
+.cast-section-count-total {
+  color: var(--color-text-secondary);
+}
+
+/* Action Buttons */
+.cast-section-actions {
+  display: flex;
+  gap: var(--spacing-md);
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.cast-action-button {
+  padding: var(--spacing-sm) var(--spacing-lg);
+  border-radius: var(--radius-lg);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  border: none;
+  cursor: pointer;
+  transition: all var(--transition-base);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  position: relative;
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+
+.cast-action-button-primary {
+  background: linear-gradient(135deg, var(--color-indigo) 0%, var(--color-purple) 100%);
+  color: white;
+}
+
+.cast-action-button-primary:hover {
+  background: linear-gradient(135deg, 
+    rgba(99, 102, 241, 0.9) 0%, 
+    rgba(168, 85, 247, 0.9) 100%);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.cast-action-button-secondary {
+  background: var(--color-bg-secondary);
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-border);
+}
+
+.cast-action-button-secondary:hover {
+  background: var(--color-bg-hover);
+  border-color: var(--color-indigo);
+  color: var(--color-indigo);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+/* Content */
+.cast-section-content {
+  margin-top: var(--spacing-xs);
+}
+
+.cast-grid-modern {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(5rem, 1fr));
+  gap: var(--spacing-md);
+  max-width: 100%;
+}
+
+.cast-item-modern {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  background: var(--color-bg-tertiary);
+  border: 2px solid var(--color-border);
+  cursor: pointer;
+  transition: all var(--transition-base);
+  box-shadow: var(--shadow-sm);
+}
+
+.cast-item-modern:hover {
+  border-color: var(--color-indigo);
+  transform: translateY(-4px) scale(1.05);
+  box-shadow: var(--shadow-lg);
+}
+
+.cast-item-number-modern {
+  position: absolute;
+  top: var(--spacing-xs);
+  left: var(--spacing-xs);
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(8px);
+  color: white;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  padding: 0.25rem 0.5rem;
+  border-radius: var(--radius-md);
+  z-index: 2;
+  font-family: var(--font-family-mono);
+}
+
+.cast-item-image-modern {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.cast-item-remove-modern {
+  position: absolute;
+  top: var(--spacing-xs);
+  right: var(--spacing-xs);
+  padding: var(--spacing-xs);
+  background: rgba(239, 68, 68, 0.9);
+  backdrop-filter: blur(8px);
+  color: white;
+  border-radius: var(--radius-md);
+  border: none;
+  cursor: pointer;
+  opacity: 0;
+  transform: scale(0.8);
+  transition: all var(--transition-base);
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cast-item-modern:hover .cast-item-remove-modern {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.cast-item-remove-modern:hover {
+  background: rgba(239, 68, 68, 1);
+  transform: scale(1.1);
+}
+
+.cast-upload-modern {
+  aspect-ratio: 1;
+  border: 2px dashed var(--color-border);
+  border-radius: var(--radius-xl);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all var(--transition-base);
+  background: var(--color-bg-secondary);
+  gap: var(--spacing-sm);
+  position: relative;
+  overflow: hidden;
+  text-align: center;
+  padding: var(--spacing-md);
+}
+
+.cast-upload-modern:hover {
+  border-color: var(--color-indigo);
+  background: linear-gradient(135deg, 
+    rgba(99, 102, 241, 0.05) 0%, 
+    rgba(168, 85, 247, 0.05) 100%);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.cast-upload-icon-modern {
+  width: 3rem;
+  height: 3rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-full);
+  background: linear-gradient(135deg, var(--color-indigo) 0%, var(--color-purple) 100%);
+  color: white;
+  transition: all var(--transition-base);
+  box-shadow: var(--shadow-sm);
+}
+
+.cast-upload-modern:hover .cast-upload-icon-modern {
+  transform: scale(1.1) rotate(90deg);
+  box-shadow: var(--shadow-md);
+}
+
+.cast-upload-text-modern {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-primary);
+  font-weight: var(--font-weight-medium);
+}
+
+.cast-upload-hint-modern {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+}
+
+/* Character Library */
+.cast-library-modern {
+  margin-top: var(--spacing-md);
+  padding-top: var(--spacing-lg);
+  border-top: 1px solid var(--color-border);
+}
+
+.cast-library-header-modern {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--spacing-md);
+}
+
+.cast-library-title-group {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  color: var(--color-text-secondary);
+}
+
+.cast-library-title {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+}
+
+.cast-library-count-modern {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  background: var(--color-bg-tertiary);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--radius-full);
+}
+
+.cast-library-list-modern {
+  display: flex;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+}
+
+.cast-library-item-modern {
+  position: relative;
+  width: 4rem;
+  height: 4rem;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  border: 2px solid var(--color-border);
+  cursor: pointer;
+  transition: all var(--transition-base);
+  background: var(--color-bg-tertiary);
+}
+
+.cast-library-item-modern:hover {
+  border-color: var(--color-indigo);
+  transform: translateY(-2px) scale(1.05);
+  box-shadow: var(--shadow-md);
+}
+
+.cast-library-item-image-modern {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.cast-library-item-overlay-modern {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity var(--transition-base);
+  color: white;
+}
+
+.cast-library-item-modern:hover .cast-library-item-overlay-modern {
+  opacity: 1;
+}
+
+.cast-library-item-name-modern {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.8), transparent);
+  color: white;
+  font-size: var(--font-size-xs);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  text-align: center;
+  opacity: 0;
+  transition: opacity var(--transition-base);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cast-library-item-modern:hover .cast-library-item-name-modern {
+  opacity: 1;
+}
+
+/* ============================================
+   故事大纲模块 - 现代化设计
+   ============================================ */
+
+.story-outline-modern {
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-2xl);
+  padding: var(--spacing-xl);
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+  position: relative;
+  overflow: hidden;
+  transition: all var(--transition-base);
+  min-height: 300px;
+}
+
+.story-outline-modern::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, 
+    rgba(99, 102, 241, 0.8) 0%, 
+    rgba(168, 85, 247, 0.8) 50%, 
+    rgba(236, 72, 153, 0.8) 100%);
+  border-radius: var(--radius-2xl) var(--radius-2xl) 0 0;
+}
+
+.story-outline-modern:hover {
+  box-shadow: var(--shadow-xl);
+  border-color: rgba(99, 102, 241, 0.3);
+}
+
+/* Header */
+.story-outline-header-modern {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--spacing-md);
+}
+
+.story-outline-title-group {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-md);
+  flex: 1;
+}
+
+.story-outline-icon {
+  width: 2rem;
+  height: 2rem;
+  color: var(--color-indigo);
+  flex-shrink: 0;
+  margin-top: 0.125rem;
+}
+
+.story-outline-title {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+  margin: 0;
+  line-height: 1.4;
+}
+
+.story-outline-subtitle {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  margin-top: var(--spacing-xs);
+  line-height: 1.5;
+}
+
+.story-outline-actions-modern {
+  display: flex;
+  gap: var(--spacing-md);
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.story-outline-action-button {
+  padding: var(--spacing-sm) var(--spacing-lg);
+  border-radius: var(--radius-lg);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  border: none;
+  cursor: pointer;
+  transition: all var(--transition-base);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  position: relative;
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+
+.story-outline-action-button-primary {
+  background: linear-gradient(135deg, var(--color-indigo) 0%, var(--color-purple) 100%);
+  color: white;
+}
+
+.story-outline-action-button-primary:hover:not(:disabled) {
+  background: linear-gradient(135deg, 
+    rgba(99, 102, 241, 0.9) 0%, 
+    rgba(168, 85, 247, 0.9) 100%);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.story-outline-action-button-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.story-outline-action-button-secondary {
+  background: var(--color-bg-secondary);
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-border);
+}
+
+.story-outline-action-button-secondary:hover {
+  background: var(--color-bg-hover);
+  border-color: var(--color-indigo);
+  color: var(--color-indigo);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+/* Content */
+.story-outline-content-modern {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.story-outline-textarea-modern {
+  width: 100%;
+  flex: 1;
+  min-height: 12rem;
+  padding: var(--spacing-lg);
+  background: var(--color-bg-secondary);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  color: var(--color-text-primary);
+  font-size: var(--font-size-base);
+  font-family: inherit;
+  line-height: 1.6;
+  resize: vertical;
+  transition: all var(--transition-base);
+}
+
+.story-outline-textarea-modern:focus {
+  outline: none;
+  border-color: var(--color-indigo);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1),
+              0 4px 12px rgba(99, 102, 241, 0.15);
+  background: var(--color-bg-primary);
+}
+
+.story-outline-textarea-modern::placeholder {
+  color: var(--color-text-muted);
+  opacity: 0.6;
+}
+
+.story-outline-textarea-modern:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.story-outline-counter {
+  position: absolute;
+  bottom: var(--spacing-sm);
+  right: var(--spacing-sm);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  background: var(--color-bg-primary);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  pointer-events: none;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .cast-section-actions,
+  .story-outline-actions-modern {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .cast-action-button,
+  .story-outline-action-button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .cast-grid-modern {
+    grid-template-columns: repeat(auto-fill, minmax(4rem, 1fr));
+    gap: var(--spacing-sm);
+  }
+
+  .cast-section-header,
+  .story-outline-header-modern {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .cast-section-count {
+    align-self: flex-end;
+  }
+}
+

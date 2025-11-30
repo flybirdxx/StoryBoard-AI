@@ -1,22 +1,38 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, lazy, Suspense, useMemo } from 'react';
 import { checkApiKey } from './services/geminiService';
 import { exportScenes } from './services/exportService';
-import StoryForm from './components/StoryForm';
-import Storyboard from './components/Storyboard';
-import ApiKeySelector from './components/ApiKeySelector';
-import AnchorReviewModal from './components/AnchorReviewModal';
-import Sidebar, { ViewType } from './components/Sidebar';
-import CharacterLibrary from './components/CharacterLibrary';
-import ProjectList from './components/ProjectList';
 import { Loader2 } from 'lucide-react';
 import { Toaster, toast } from 'sonner';
+import { useTheme } from './hooks/useTheme';
+import './styles/app.css';
+
+// 代码分割：懒加载大型组件
+const StoryForm = lazy(() => import('./components/StoryForm'));
+const Storyboard = lazy(() => import('./components/Storyboard'));
+const ApiKeySelector = lazy(() => import('./components/ApiKeySelector'));
+const AnchorReviewModal = lazy(() => import('./components/AnchorReviewModal'));
+const Sidebar = lazy(() => import('./components/Sidebar'));
+const CharacterLibrary = lazy(() => import('./components/CharacterLibrary'));
+const ProjectList = lazy(() => import('./components/ProjectList'));
+
+// 导入 ViewType
+import type { ViewType } from './types/view';
 
 // State & Hooks
 import { useStoryStore } from './store/useStoryStore';
 import { useStoryGeneration } from './hooks/useStoryGeneration';
 
+// 加载中占位符组件
+const LoadingFallback: React.FC = () => (
+  <div className="loading-fallback">
+    <Loader2 className="loading-fallback-spinner" />
+  </div>
+);
+
 const App: React.FC = () => {
+  console.log('App component rendering...');
+  const { theme, toggleTheme } = useTheme();
   const [hasKey, setHasKey] = useState<boolean>(false);
   const [showSettings, setShowSettings] = useState(false);
   const [currentView, setCurrentView] = useState<ViewType>('create');
@@ -108,66 +124,75 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="flex h-screen bg-[#0f111a] text-white font-sans overflow-hidden selection:bg-indigo-500/30">
-      <Toaster theme="dark" position="top-center" richColors />
+    <div className="app-container">
+      <Toaster theme={theme === 'dark' ? 'dark' : 'light'} position="top-center" richColors />
       
       {(!hasKey || showSettings) && (
-        <ApiKeySelector 
-          onKeySelected={handleKeySelected} 
-          onClose={hasKey ? () => setShowSettings(false) : undefined}
-        />
+        <Suspense fallback={<LoadingFallback />}>
+          <ApiKeySelector 
+            onKeySelected={handleKeySelected} 
+            onClose={hasKey ? () => setShowSettings(false) : undefined}
+          />
+        </Suspense>
       )}
 
       {showAnchorModal && (
-        <AnchorReviewModal 
-          anchors={detectedAnchors}
-          referenceImages={originalImages}
-          onConfirm={handleConfirmAnchors}
-          onCancel={() => { 
-             setShowAnchorModal(false);
-             cancelGeneration(); // Ensure we abort the process if user cancels at this stage
-          }}
-        />
+        <Suspense fallback={<LoadingFallback />}>
+          <AnchorReviewModal 
+            anchors={detectedAnchors}
+            referenceImages={originalImages}
+            onConfirm={handleConfirmAnchors}
+            onCancel={() => { 
+               setShowAnchorModal(false);
+               cancelGeneration(); // Ensure we abort the process if user cancels at this stage
+            }}
+          />
+        </Suspense>
       )}
 
       {/* LEFT SIDEBAR */}
-      <Sidebar 
-        currentView={currentView} 
-        onChangeView={(view) => {
-           // Only reset story if we are going to create view AND not currently generating.
-           // This protects the 'settings' in store which are needed during generation.
-           if (view === 'create' && !isScriptLoading) createNewStory(); 
-           setCurrentView(view);
-        }} 
-        // Allow navigation to editor if story exists OR if it is currently generating
-        hasActiveStory={!!story || isScriptLoading}
-        onOpenSettings={() => setShowSettings(true)}
-      />
+      <Suspense fallback={<LoadingFallback />}>
+        <Sidebar 
+          currentView={currentView} 
+          onChangeView={(view) => {
+             // Only reset story if we are going to create view AND not currently generating.
+             // This protects the 'settings' in store which are needed during generation.
+             if (view === 'create' && !isScriptLoading) createNewStory(); 
+             setCurrentView(view);
+          }} 
+          // Allow navigation to editor if story exists OR if it is currently generating
+          hasActiveStory={!!story || isScriptLoading}
+          onOpenSettings={() => setShowSettings(true)}
+        />
+      </Suspense>
 
       {/* MAIN CONTENT AREA */}
-      <main className="flex-1 overflow-y-auto relative custom-scrollbar bg-[#0f111a]">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-900/10 via-slate-950/40 to-slate-950 pointer-events-none"></div>
-        <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-10 pointer-events-none mix-blend-overlay"></div>
-
-        <div className="h-full relative z-10 flex flex-col">
+      <main className="app-main custom-scrollbar">
+        <div className="app-content">
           
           {/* VIEW: CREATE PROJECT */}
           {currentView === 'create' && (
-            <StoryForm 
-              onSubmit={handleGenerateRequest} 
-              isGenerating={isScriptLoading || isAnalyzingAnchors} 
-              onCancel={cancelGeneration}
-            />
+            <Suspense fallback={<LoadingFallback />}>
+              <StoryForm 
+                onSubmit={handleGenerateRequest} 
+                isGenerating={isScriptLoading || isAnalyzingAnchors} 
+                onCancel={cancelGeneration}
+              />
+            </Suspense>
           )}
 
           {/* VIEW: PROJECTS LIST */}
           {currentView === 'projects' && (
-             <ProjectList onOpenProject={() => setCurrentView('editor')} />
+            <Suspense fallback={<LoadingFallback />}>
+              <ProjectList onOpenProject={() => setCurrentView('editor')} />
+            </Suspense>
           )}
 
           {/* VIEW: CHARACTER LIBRARY */}
           {currentView === 'characters' && (
-             <CharacterLibrary />
+            <Suspense fallback={<LoadingFallback />}>
+              <CharacterLibrary />
+            </Suspense>
           )}
 
           {/* VIEW: EDITOR / STORYBOARD */}
@@ -175,30 +200,32 @@ const App: React.FC = () => {
             <div className="flex-1 overflow-hidden flex flex-col">
               {/* Storyboard container handles its own scroll internally when needed (list view) or naturally */}
               <div className="h-full w-full">
-                 <Storyboard onExport={handleExport} />
+                <Suspense fallback={<LoadingFallback />}>
+                  <Storyboard onExport={handleExport} />
+                </Suspense>
               </div>
             </div>
           )}
 
           {/* EMPTY EDITOR STATE */}
           {currentView === 'editor' && !story && !isScriptLoading && (
-             <div className="h-full flex flex-col items-center justify-center text-slate-500">
-                <Loader2 className="w-10 h-10 mb-4 opacity-20" />
-                <p>暂无活跃项目。请前往创作中心生成新故事或打开已有项目。</p>
-                <div className="flex gap-4 mt-4">
-                   <button onClick={() => setCurrentView('create')} className="text-indigo-400 hover:text-white underline text-sm">去创作</button>
-                   <button onClick={() => setCurrentView('projects')} className="text-indigo-400 hover:text-white underline text-sm">打开项目</button>
+             <div className="empty-state">
+                <Loader2 className="empty-state-icon" />
+                <p className="empty-state-text">暂无活跃项目。请前往创作中心生成新故事或打开已有项目。</p>
+                <div className="empty-state-actions">
+                   <button onClick={() => setCurrentView('create')} className="empty-state-link">去创作</button>
+                   <button onClick={() => setCurrentView('projects')} className="empty-state-link">打开项目</button>
                 </div>
              </div>
           )}
           
           {/* Global Loading Overlay if needed for script generation when in editor view */}
           {currentView === 'editor' && isScriptLoading && !story && (
-              <div className="h-full flex flex-col items-center justify-center">
-                 <Loader2 className="w-12 h-12 text-indigo-500 animate-spin mb-4" />
-                 <h3 className="text-xl font-bold text-white">正在创作故事...</h3>
-                 <p className="text-slate-400 mt-2">Gemini 3 Pro 正在编写剧本并设计分镜</p>
-                 <button onClick={cancelGeneration} className="mt-6 px-4 py-2 border border-red-500/30 text-red-400 rounded-lg text-sm hover:bg-red-500/10 transition-colors">
+              <div className="global-loading">
+                 <Loader2 className="global-loading-spinner" />
+                 <h3 className="global-loading-title">正在创作故事...</h3>
+                 <p className="global-loading-description">Gemini 3 Pro 正在编写剧本并设计分镜</p>
+                 <button onClick={cancelGeneration} className="global-loading-cancel">
                     取消任务
                  </button>
               </div>

@@ -1,17 +1,39 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Sparkles, X, Palette, Plus, Users, PenTool, LayoutTemplate, Square, Monitor, Wand2, Loader2, StopCircle } from 'lucide-react';
-import { ArtStyle, GenerationMode, AspectRatio, Character } from '../types';
+import { Sparkles, X, Palette, Plus, Users, PenTool, LayoutTemplate, Square, Monitor, Wand2, Loader2, StopCircle, UserPlus } from 'lucide-react';
+import { ArtStyle, GenerationMode, AspectRatio, Character, ExtractedCharacter } from '../types';
 import { ART_STYLE_OPTIONS, ASPECT_RATIOS } from '../constants';
 import CharacterWorkshop from './CharacterWorkshop';
+import CharacterExtractor from './CharacterExtractor';
 import { useStoryStore } from '../store/useStoryStore';
 import { toast } from 'sonner';
+import { optimizeStoryOutline } from '../services/geminiService';
+import '../styles/story-form.css';
 
 interface StoryFormProps {
   onSubmit: (theme: string, images: string[], artStyle: ArtStyle, mode: GenerationMode, ratio: AspectRatio) => void;
   isGenerating: boolean;
   onCancel?: () => void;
 }
+
+// 渐变颜色映射
+const getGradientColors = (gradient: string): { start: string; end: string } => {
+  const gradientMap: Record<string, { start: string; end: string }> = {
+    'from-slate-900 to-slate-700': { start: '#0f172a', end: '#334155' },
+    'from-red-900 to-blue-900': { start: '#7f1d1d', end: '#1e3a8a' },
+    'from-pink-900 to-indigo-900': { start: '#831843', end: '#312e81' },
+    'from-emerald-900 to-teal-900': { start: '#064e3b', end: '#134e4a' },
+    'from-fuchsia-900 to-purple-900': { start: '#701a75', end: '#581c87' },
+    'from-amber-900 to-orange-900': { start: '#78350f', end: '#9a3412' },
+    'from-gray-900 to-black': { start: '#111827', end: '#000000' },
+    'from-blue-600 to-cyan-500': { start: '#2563eb', end: '#06b6d4' },
+    'from-gray-200 to-white': { start: '#e5e7eb', end: '#ffffff' },
+    'from-indigo-600 to-purple-600': { start: '#4f46e5', end: '#9333ea' },
+    'from-yellow-700 to-blue-800': { start: '#a16207', end: '#1e40af' },
+    'from-slate-800 to-zinc-900': { start: '#1e293b', end: '#18181b' },
+  };
+  return gradientMap[gradient] || { start: '#1e293b', end: '#18181b' };
+};
 
 const StoryForm: React.FC<StoryFormProps> = ({ onSubmit, isGenerating, onCancel }) => {
   const { savedCharacters, addSavedCharacter } = useStoryStore();
@@ -20,8 +42,10 @@ const StoryForm: React.FC<StoryFormProps> = ({ onSubmit, isGenerating, onCancel 
   const [selectedStyle, setSelectedStyle] = useState<ArtStyle>('电影写实');
   const [customStyleInput, setCustomStyleInput] = useState('');
   const [showWorkshop, setShowWorkshop] = useState(false);
+  const [showExtractor, setShowExtractor] = useState(false);
   const [mode, setMode] = useState<GenerationMode>('storyboard');
   const [aspectRatio, setAspectRatio] = useState<AspectRatio>('16:9');
+  const [isOptimizing, setIsOptimizing] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -53,6 +77,57 @@ const StoryForm: React.FC<StoryFormProps> = ({ onSubmit, isGenerating, onCancel 
     toast.success(`已添加角色: ${char.name}`);
   };
 
+  const handleExtractedCharacters = (extracted: ExtractedCharacter[]) => {
+    // 将提取的角色图像添加到演员阵容
+    const newImages = extracted
+      .filter(char => char.imageUrl)
+      .map(char => char.imageUrl!)
+      .slice(0, 10 - images.length);
+    
+    if (newImages.length > 0) {
+      setImages(prev => [...prev, ...newImages]);
+      toast.success(`已添加 ${newImages.length} 个角色图像到演员阵容`);
+    } else {
+      toast.info("提取的角色没有图像，请先为角色生成图像");
+    }
+    
+    // 可选：将提取的角色保存到角色库
+    extracted.forEach(char => {
+      if (char.imageUrl) {
+        addSavedCharacter({
+          id: char.id,
+          name: char.name,
+          description: `${char.description}\n\n外观：${char.appearance}${char.personality ? `\n性格：${char.personality}` : ''}`,
+          imageUrl: char.imageUrl,
+          appearance: char.appearance,
+          personality: char.personality,
+          role: char.role,
+        });
+      }
+    });
+    
+    setShowExtractor(false);
+  };
+
+  const handleOptimizeOutline = async () => {
+    if (!theme.trim()) {
+      toast.error("请先输入故事大纲");
+      return;
+    }
+
+    setIsOptimizing(true);
+    try {
+      const optimized = await optimizeStoryOutline(theme, mode);
+      setTheme(optimized);
+      toast.success("故事大纲已优化！");
+    } catch (error: any) {
+      console.error("Optimize outline error:", error);
+      toast.error(error?.message || "优化失败，请稍后重试");
+    } finally {
+      setIsOptimizing(false);
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     let finalStyle = selectedStyle;
@@ -67,44 +142,66 @@ const StoryForm: React.FC<StoryFormProps> = ({ onSubmit, isGenerating, onCancel 
   };
 
   return (
-    <div className="p-6 lg:p-12 max-w-7xl mx-auto animate-in fade-in duration-500 pb-24">
-       <div className="mb-10">
-          <h2 className="text-3xl font-bold text-white mb-2">开始创作</h2>
-          <p className="text-slate-400 font-light">配置您的项目参数，Gemini 将为您构建视觉世界。</p>
+    <div className="story-form-container">
+       <div className="story-form-wrapper">
+          <div className="story-form-header">
+             <h2 className="story-form-title">开始创作</h2>
+             <p className="story-form-subtitle">配置您的项目参数，Gemini 将为您构建视觉世界。</p>
        </div>
 
-       <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+          <form onSubmit={handleSubmit} className="story-form-grid">
           
           {/* LEFT COLUMN: Configuration */}
-          <div className="lg:col-span-5 space-y-6">
+          <div className="story-form-left">
              {/* Mode & Ratio Card */}
-             <div className="bg-[#13161f] border border-white/5 rounded-2xl p-6 shadow-xl space-y-6">
-                <div className="flex items-center gap-2 mb-2">
-                   <LayoutTemplate className="w-4 h-4 text-indigo-400" />
-                   <h3 className="text-sm font-bold text-white uppercase tracking-wider">基础设置</h3>
+             <div className="settings-card">
+                <div className="settings-card-header">
+                   <LayoutTemplate className="icon-md icon-indigo" />
+                   <h3 className="settings-card-title">基础设置</h3>
                 </div>
 
                 <div className="space-y-3">
-                   <label className="text-xs text-slate-500 font-bold">生成模式</label>
-                   <div className="grid grid-cols-2 gap-3">
-                     <button type="button" onClick={() => setMode('storyboard')} className={`p-4 rounded-xl border text-left transition-all ${mode === 'storyboard' ? 'bg-indigo-600/10 border-indigo-500 text-white' : 'bg-black/20 border-white/5 text-slate-400 hover:bg-white/5'}`}>
-                        <Monitor className={`w-5 h-5 mb-2 ${mode === 'storyboard' ? 'text-indigo-400' : 'text-slate-500'}`} />
-                        <div className="font-bold text-sm">分镜故事</div>
-                        <div className="text-[10px] opacity-60">Cinematic Storyboard</div>
+                   <label className="label">生成模式</label>
+                    <div className="mode-selector">
+                      <button 
+                        type="button" 
+                        onClick={() => setMode('storyboard')} 
+                        className={`mode-button ${mode === 'storyboard' ? 'active' : ''}`}
+                      >
+                        <div className="mode-button-icon-wrapper">
+                          <Monitor className="mode-button-icon" />
+                        </div>
+                        <div className="mode-button-content">
+                          <div className="mode-button-label">分镜故事</div>
+                          <div className="mode-button-desc">Cinematic Storyboard</div>
+                        </div>
                      </button>
-                     <button type="button" onClick={() => setMode('comic')} className={`p-4 rounded-xl border text-left transition-all ${mode === 'comic' ? 'bg-indigo-600/10 border-indigo-500 text-white' : 'bg-black/20 border-white/5 text-slate-400 hover:bg-white/5'}`}>
-                        <Square className={`w-5 h-5 mb-2 ${mode === 'comic' ? 'text-indigo-400' : 'text-slate-500'}`} />
-                        <div className="font-bold text-sm">宫格漫画</div>
-                        <div className="text-[10px] opacity-60">Comic Strip / Manga</div>
+                      <button 
+                        type="button" 
+                        onClick={() => setMode('comic')} 
+                        className={`mode-button ${mode === 'comic' ? 'active' : ''}`}
+                      >
+                        <div className="mode-button-icon-wrapper">
+                          <Square className="mode-button-icon" />
+                        </div>
+                        <div className="mode-button-content">
+                          <div className="mode-button-label">条漫漫画</div>
+                          <div className="mode-button-desc">Comic Strip / Manga</div>
+                        </div>
                      </button>
                    </div>
                 </div>
 
                 <div className="space-y-3">
-                   <label className="text-xs text-slate-500 font-bold">画幅比例</label>
-                   <div className="flex flex-wrap gap-2">
+                   <label className="label">画幅比例</label>
+                   <div className="aspect-ratio-selector">
                       {ASPECT_RATIOS.map((ratio) => (
-                        <button key={ratio} type="button" onClick={() => setAspectRatio(ratio)} className={`px-4 py-2 rounded-lg text-xs font-bold border transition-all ${aspectRatio === ratio ? 'bg-indigo-500/20 border-indigo-500 text-indigo-300' : 'bg-black/20 border-transparent text-slate-500 hover:border-white/10'}`}>
+                        <button 
+                          key={ratio} 
+                          type="button" 
+                          onClick={() => setAspectRatio(ratio)} 
+                          className={`aspect-ratio-button ${aspectRatio === ratio ? 'active' : ''}`}
+                        >
                           {ratio}
                         </button>
                       ))}
@@ -113,35 +210,31 @@ const StoryForm: React.FC<StoryFormProps> = ({ onSubmit, isGenerating, onCancel 
              </div>
 
              {/* Style Card */}
-             <div className="bg-[#13161f] border border-white/5 rounded-2xl p-6 shadow-xl space-y-4">
-                <div className="flex items-center gap-2 mb-2">
-                   <Palette className="w-4 h-4 text-purple-400" />
-                   <h3 className="text-sm font-bold text-white uppercase tracking-wider">艺术风格</h3>
+             <div className="settings-card">
+                <div className="settings-card-header">
+                   <Palette className="icon-md icon-indigo" />
+                   <h3 className="settings-card-title">艺术风格</h3>
                 </div>
                 
-                <div className="grid grid-cols-2 gap-2.5">
+                <div className="art-style-grid">
                    {ART_STYLE_OPTIONS.map((style) => (
                       <button
                         key={style.id}
                         type="button"
                         onClick={() => setSelectedStyle(style.id)}
-                        className={`relative p-3 rounded-xl border text-left transition-all overflow-hidden group flex flex-col justify-between h-20 ${
-                           selectedStyle === style.id 
-                             ? 'bg-indigo-500/10 border-indigo-500/50 ring-1 ring-indigo-500/20' 
-                             : 'bg-black/20 border-white/5 hover:border-white/20 hover:bg-white/5'
-                        }`}
+                        className={`art-style-button ${selectedStyle === style.id ? 'active' : ''}`}
                       >
-                         <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${style.fallbackGradient} opacity-60 group-hover:opacity-100 transition-opacity`} />
-                         <div className="mt-1">
-                             <div className="flex items-center justify-between">
-                                <span className={`text-xs font-bold block mb-0.5 ${selectedStyle === style.id ? 'text-white' : 'text-slate-400 group-hover:text-slate-200'}`}>
+                         <div 
+                           className="art-style-gradient" 
+                           style={{
+                             background: `linear-gradient(to right, ${getGradientColors(style.fallbackGradient).start}, ${getGradientColors(style.fallbackGradient).end})`
+                           }}
+                         />
+                         <div className="art-style-content">
+                             <span className="art-style-label">
                                     {style.label}
                                 </span>
-                                {selectedStyle === style.id && (
-                                   <div className="w-1.5 h-1.5 rounded-full bg-indigo-400 shadow-[0_0_6px_rgba(129,140,248,1)]"></div>
-                                )}
-                             </div>
-                             <span className="text-[9px] text-slate-600 leading-tight block line-clamp-2 pr-1">
+                             <span className="art-style-desc">
                                  {style.desc}
                              </span>
                          </div>
@@ -150,16 +243,16 @@ const StoryForm: React.FC<StoryFormProps> = ({ onSubmit, isGenerating, onCancel 
                 </div>
 
                 {selectedStyle === 'custom' && (
-                  <div className="animate-in fade-in slide-in-from-top-2 pt-2 bg-black/20 rounded-xl p-3 border border-white/5">
-                     <label className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider mb-2 block flex items-center gap-2">
-                        <Wand2 className="w-3 h-3" />
+                  <div className="custom-style-input">
+                     <label className="custom-style-label">
+                        <Wand2 className="icon-sm" />
                         输入自定义风格提示词
                      </label>
                      <textarea
                         value={customStyleInput}
                         onChange={(e) => setCustomStyleInput(e.target.value)}
                         placeholder="例如：梵高星空风格，厚涂油画，蓝色与黄色主调，笔触明显..."
-                        className="w-full bg-black/40 border border-white/10 rounded-lg p-2.5 text-xs text-white placeholder-slate-600 focus:ring-1 focus:ring-indigo-500 outline-none resize-none shadow-inner"
+                        className="custom-style-textarea"
                         rows={3}
                      />
                   </div>
@@ -168,45 +261,114 @@ const StoryForm: React.FC<StoryFormProps> = ({ onSubmit, isGenerating, onCancel 
           </div>
 
           {/* RIGHT COLUMN */}
-          <div className="lg:col-span-7 space-y-6">
-             {/* Character Selection */}
-             <div className="bg-[#13161f] border border-white/5 rounded-2xl p-6 shadow-xl space-y-4">
-                <div className="flex items-center justify-between mb-2">
-                   <div className="flex items-center gap-2">
-                      <Users className="w-4 h-4 text-pink-400" />
-                      <h3 className="text-sm font-bold text-white uppercase tracking-wider">演员阵容</h3>
+          <div className="story-form-right">
+             {/* Character Selection - Redesigned */}
+             <div className="cast-section-modern">
+                {/* Header */}
+                <div className="cast-section-header">
+                   <div className="cast-section-title-group">
+                      <Users className="cast-section-icon" />
+                      <div>
+                         <h3 className="cast-section-title">演员阵容</h3>
+                         <p className="cast-section-subtitle">添加角色图像以保持视觉一致性</p>
+                      </div>
                    </div>
-                   <button type="button" onClick={() => setShowWorkshop(true)} className="text-xs bg-white/5 hover:bg-white/10 px-3 py-1.5 rounded-lg text-slate-300 transition-colors flex items-center gap-2">
-                      <Plus className="w-3 h-3" /> 新建角色
+                   <div className="cast-section-count">
+                      <span className="cast-section-count-current">{images.length}</span>
+                      <span className="cast-section-count-separator">/</span>
+                      <span className="cast-section-count-total">10</span>
+                   </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="cast-section-actions">
+                   <button 
+                      type="button" 
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (!theme.trim()) {
+                          toast.error("请先输入故事大纲");
+                          return;
+                        }
+                        setShowExtractor(true);
+                      }} 
+                      className="cast-action-button cast-action-button-primary"
+                      title="从大纲中自动提取角色"
+                   >
+                      <UserPlus size={18} />
+                      <span>自动提取</span>
+                   </button>
+                   <button 
+                      type="button" 
+                      onClick={() => setShowWorkshop(true)} 
+                      className="cast-action-button cast-action-button-secondary"
+                      title="创建新角色"
+                   >
+                      <Plus size={18} />
+                      <span>新建角色</span>
                    </button>
                 </div>
                 
-                <div className="grid grid-cols-4 sm:grid-cols-5 gap-3">
-                   {images.map((img, idx) => (
-                      <div key={idx} className="relative aspect-square rounded-xl overflow-hidden bg-black/40 border border-white/10 group hover:border-indigo-500/50 transition-all shadow-sm">
-                         <img src={img} className="w-full h-full object-cover" />
-                         <button type="button" onClick={() => removeImage(idx)} className="absolute top-1 right-1 p-1 bg-black/60 hover:bg-red-500 text-white rounded-md transition-all opacity-0 group-hover:opacity-100 scale-90 group-hover:scale-100">
-                            <X className="w-3 h-3" />
-                         </button>
-                      </div>
-                   ))}
-                   {images.length < 10 && (
-                      <div onClick={triggerFileSelect} className="aspect-square border border-dashed border-white/10 hover:border-indigo-500/50 bg-white/5 hover:bg-white/10 rounded-xl flex flex-col items-center justify-center cursor-pointer transition-all group">
-                         <Plus className="w-5 h-5 text-slate-500 group-hover:text-indigo-400 mb-1" />
-                         <span className="text-[9px] text-slate-500">Upload</span>
-                      </div>
-                   )}
+                {/* Cast Grid */}
+                <div className="cast-section-content">
+                   <div className="cast-grid-modern">
+                      {images.map((img, idx) => (
+                         <div key={idx} className="cast-item-modern">
+                            <div className="cast-item-number-modern">{idx + 1}</div>
+                            <img src={img} className="cast-item-image-modern" alt={`Character ${idx + 1}`} />
+                            <button 
+                               type="button" 
+                               onClick={() => removeImage(idx)} 
+                               className="cast-item-remove-modern"
+                               title="移除"
+                            >
+                               <X size={14} />
+                            </button>
+                         </div>
+                      ))}
+                      {images.length < 10 && (
+                         <div 
+                            onClick={triggerFileSelect} 
+                            className="cast-upload-modern"
+                            title="上传图片"
+                         >
+                            <div className="cast-upload-icon-modern">
+                               <Plus size={24} />
+                            </div>
+                            <span className="cast-upload-text-modern">上传图片</span>
+                            <span className="cast-upload-hint-modern">支持多选</span>
+                         </div>
+                      )}
+                   </div>
                 </div>
-                <input type="file" ref={fileInputRef} onChange={handleFileChange} accept="image/*" className="hidden" />
                 
+                <input type="file" ref={fileInputRef} onChange={handleFileChange} accept="image/*" multiple className="hidden" />
+                
+                {/* Character Library */}
                 {savedCharacters.length > 0 && (
-                   <div className="pt-2 border-t border-white/5 mt-4">
-                      <p className="text-[10px] text-slate-500 mb-2 font-bold uppercase">从库中选择</p>
-                      <div className="flex gap-3 overflow-x-auto pb-2 custom-scrollbar">
+                   <div className="cast-library-modern">
+                      <div className="cast-library-header-modern">
+                         <div className="cast-library-title-group">
+                            <Users size={16} />
+                            <span className="cast-library-title">角色库</span>
+                         </div>
+                         <span className="cast-library-count-modern">{savedCharacters.length} 个角色</span>
+                      </div>
+                      <div className="cast-library-list-modern">
                          {savedCharacters.map(char => (
-                            <button key={char.id} type="button" onClick={() => handleAddSavedCharacter(char)} className="flex-shrink-0 w-12 h-12 rounded-full overflow-hidden border border-white/10 hover:border-indigo-500 transition-all relative group" title={char.name}>
-                               <img src={char.imageUrl} className="w-full h-full object-cover" />
-                               <div className="absolute inset-0 bg-indigo-500/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"><Plus className="w-4 h-4 text-white" /></div>
+                            <button 
+                              key={char.id} 
+                              type="button" 
+                              onClick={() => handleAddSavedCharacter(char)} 
+                              className="cast-library-item-modern" 
+                              title={char.name}
+                            >
+                               <img src={char.imageUrl} className="cast-library-item-image-modern" alt={char.name} />
+                               <div className="cast-library-item-overlay-modern">
+                                 <Plus size={16} />
+                               </div>
+                               <div className="cast-library-item-name-modern">{char.name}</div>
                             </button>
                          ))}
                       </div>
@@ -214,46 +376,109 @@ const StoryForm: React.FC<StoryFormProps> = ({ onSubmit, isGenerating, onCancel 
                 )}
              </div>
 
-             {/* Prompt & Submit */}
-             <div className="bg-[#13161f] border border-white/5 rounded-2xl p-6 shadow-xl flex flex-col gap-4 min-h-[200px]">
-                <div className="flex items-center gap-2 mb-2">
-                   <PenTool className="w-4 h-4 text-green-400" />
-                   <h3 className="text-sm font-bold text-white uppercase tracking-wider">故事大纲</h3>
+             {/* Story Outline - Redesigned */}
+             <div className="story-outline-modern">
+                {/* Header */}
+                <div className="story-outline-header-modern">
+                   <div className="story-outline-title-group">
+                      <PenTool className="story-outline-icon" />
+                      <div>
+                         <h3 className="story-outline-title">故事大纲</h3>
+                         <p className="story-outline-subtitle">描述您的故事或漫画剧情</p>
+                      </div>
+                   </div>
+                   <div className="story-outline-actions-modern">
+                      <button 
+                         onClick={handleOptimizeOutline}
+                         disabled={!theme.trim() || isOptimizing}
+                         className="story-outline-action-button story-outline-action-button-primary"
+                         title="使用 Gemini 3 优化大纲"
+                      >
+                         {isOptimizing ? (
+                            <>
+                               <Loader2 size={16} className="animate-spin" />
+                               <span>优化中...</span>
+                            </>
+                         ) : (
+                            <>
+                               <Sparkles size={16} />
+                               <span>AI 优化</span>
+                            </>
+                         )}
+                      </button>
+                      <button 
+                         className="story-outline-action-button story-outline-action-button-secondary"
+                         title="分享"
+                      >
+                         分享
+                      </button>
+                   </div>
                 </div>
-                <textarea 
-                  value={theme} 
-                  onChange={(e) => setTheme(e.target.value)} 
-                  placeholder={mode === 'storyboard' ? "描述一个激动人心的电影开场..." : "描述一个有趣的四格漫画剧情..."} 
-                  className="w-full flex-1 bg-black/20 border border-white/10 rounded-xl p-4 text-sm text-white placeholder-slate-600 focus:ring-1 focus:ring-indigo-500 outline-none resize-none leading-relaxed" 
-                />
                 
-                <div className="flex gap-3">
-                    <button type="submit" disabled={!theme || images.length === 0 || isGenerating} className={`flex-1 py-4 px-6 rounded-xl font-bold text-base flex items-center justify-center gap-3 transition-all shadow-xl relative overflow-hidden group ${(!theme || images.length === 0 || isGenerating) ? 'bg-slate-800 text-slate-500 cursor-not-allowed' : 'bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white shadow-indigo-500/25'}`}>
+                {/* Textarea */}
+                <div className="story-outline-content-modern">
+                   <textarea 
+                      value={theme} 
+                      onChange={(e) => setTheme(e.target.value)} 
+                      placeholder={mode === 'storyboard' ? "描述一个激动人心的故事开发..." : "描述一个有趣的四格漫画剧情..."} 
+                      className="story-outline-textarea-modern"
+                      disabled={isOptimizing}
+                      rows={8}
+                   />
+                   {theme && (
+                      <div className="story-outline-counter">
+                         <span>{theme.length} 字符</span>
+                      </div>
+                   )}
+                </div>
+             </div>
+             
+             <button 
+               type="submit" 
+               disabled={!theme || images.length === 0 || isGenerating} 
+               className="story-form-submit"
+             >
                       {isGenerating ? (
                           <>
-                            <div className="absolute inset-0 bg-white/10 animate-pulse"></div>
-                            <Loader2 className="w-5 h-5 animate-spin" />
+                     <div className="story-form-submit-loading"></div>
+                     <Loader2 className="icon-lg animate-spin" />
                             <span>AI 正在分析与生成...</span>
                           </>
                       ) : (
                           <>
-                            <Sparkles className="w-5 h-5 group-hover:rotate-12 transition-transform" />
+                     <Sparkles className="icon-lg" />
                             <span>生成项目</span>
                           </>
                       )}
                     </button>
                     {isGenerating && onCancel && (
-                       <button type="button" onClick={onCancel} className="px-6 py-4 rounded-xl font-bold text-red-400 border border-red-500/30 hover:bg-red-500/10 transition-all flex items-center justify-center gap-2">
-                          <StopCircle className="w-5 h-5" />
+                <button type="button" onClick={onCancel} className="story-form-cancel">
+                   <StopCircle className="icon-lg" />
                           <span>取消</span>
                        </button>
                     )}
                 </div>
-             </div>
+          </form>
           </div>
-       </form>
        
-       {showWorkshop && <CharacterWorkshop onClose={() => setShowWorkshop(false)} onSave={addSavedCharacter} />}
+       {showWorkshop && (
+         <CharacterWorkshop 
+           onClose={() => setShowWorkshop(false)} 
+           onSave={(character) => {
+             addSavedCharacter(character);
+             setShowWorkshop(false);
+           }}
+         />
+       )}
+
+       {showExtractor && (
+         <CharacterExtractor
+           outline={theme}
+           mode={mode}
+           onConfirm={handleExtractedCharacters}
+           onCancel={() => setShowExtractor(false)}
+         />
+       )}
     </div>
   );
 };
